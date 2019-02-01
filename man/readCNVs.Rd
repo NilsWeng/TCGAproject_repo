@@ -2,10 +2,10 @@
 \alias{readCNVs}
 %- Also NEED an '\alias' for EACH other topic documented here.
 \title{
-%%  ~~function to do ... ~~
+Given a filename of a TCGA cnv file opens and convert it to GRanges object
 }
 \description{
-%%  ~~ A concise (1-5 lines) description of what the function does. ~~
+Given a filename of a TCGA cnv file opens and convert it to GRanges object
 }
 \usage{
 readCNVs(filename)

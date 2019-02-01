@@ -1,25 +1,25 @@
-\name{anRpackage-package}
-\alias{anRpackage-package}
-\alias{anRpackage}
+\name{nilsTCGA}
+\alias{nilsTCGA}
+\alias{nilsTCGA}
 \docType{package}
 \title{
-\packageTitle{anRpackage}
+\packageTitle{nilsTCGA}
 }
 \description{
-\packageDescription{anRpackage}
+\packageDescription{nilsTCGA}
 }
 \details{
 
 The DESCRIPTION file:
-\packageDESCRIPTION{anRpackage}
-\packageIndices{anRpackage}
+\packageDESCRIPTION{nilsTCGA}
+\packageIndices{nilsTCGA}
 ~~ An overview of how to use the package, including ~~
 ~~ the most important functions ~~
 }
 \author{
-\packageAuthor{anRpackage}
+\packageAuthor{Nils Weng}
 
-Maintainer: \packageMaintainer{anRpackage}
+Maintainer: \packageMaintainer{Nils Weng}
 }
 \references{
 ~~ Literature or other references for background information ~~
