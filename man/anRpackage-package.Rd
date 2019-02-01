@@ -17,9 +17,9 @@ The DESCRIPTION file:
 ~~ the most important functions ~~
 }
 \author{
-\packageAuthor{Nils Weng}
+\packageAuthor{nilsTCGA}
 
-Maintainer: \packageMaintainer{Nils Weng}
+Maintainer: \packageMaintainer{nilsTCGA}
 }
 \references{
 ~~ Literature or other references for background information ~~
