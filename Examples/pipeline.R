@@ -21,4 +21,4 @@ for (file in cnv_files){
 potential_loss <- setNames(data.frame(matrix(ncol = 6, nrow = 0)), c("GDC_Aliquot","Chromosome","Start","End","Num_Probes","Segment_Mean"))
 
 
-# IDEA about naming the GRanges objects after their id. However what is it?
+# IDEA about naming the GRanges objects after their id. However what is it
