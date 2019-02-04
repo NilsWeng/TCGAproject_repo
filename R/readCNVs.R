@@ -10,7 +10,8 @@ function(filename){
                            strand='*',
                            
                            Num_Probes=cnv_DF$Num_Probes,
-                           Segment_Mean=cnv_DF$Segment_Mean)
+                           Segment_Mean=cnv_DF$Segment_Mean,
+                           GDC_Aliquot=cnv_DF$GDC_Aliquot)
     
     return(cnv_GRanges)
     
