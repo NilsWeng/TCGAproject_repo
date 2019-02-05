@@ -8,13 +8,13 @@ library(nilsTCGA)
 df2Grange <- function(dfName){
   suppressPackageStartupMessages(library("GenomicRanges"))
   
-  GRange_object <- GRanges(seqnames =  dfName$Sample,
+  GRange_object <- GRanges(seqnames =  dfName$Chromosome,
                          ranges=IRanges(dfName$Start,dfName$End),
                          strand='*',
                          
                          Num_Probes=dfName$Num_Probes,
                          Segment_Mean=dfName$Segment_Mean,
-                         Chromosome=dfName$Chromosome)
+                         Sample=dfName$Sample)
   
   return (GRange_object)
   
@@ -30,7 +30,8 @@ df2Grange <- function(dfName){
 CNV_table <- read.table('PANCAN_CNV.seg',header = TRUE)
 
 # Extract what sample types are in the SNP_table
-types <- unique(gsub("TCGA-[A-Z0-9]*-[A-Z0-9]*-", "", (gsub("[A-Z]*-[0-9A-Z]*-[0-9A-Z]*-01$", "", CNV_table[,1]))))
+types <- gsub("TCGA-[A-Z0-9]*-[A-Z0-9]*-", "", (gsub("[A-Z]*-[0-9A-Z]*-[0-9A-Z]*-01$", "", CNV_table[,1])))
+unique(types)
 
 
 
@@ -40,8 +41,8 @@ types <- unique(gsub("TCGA-[A-Z0-9]*-[A-Z0-9]*-", "", (gsub("[A-Z]*-[0-9A-Z]*-[0
 tumor <- c("01","06","02","05")
 normal <- c("10","11","12","14")
 
-CN_tumor <- CNV_table[which(types %in% tumor),]
-CN_normal <- CNV_table[which(types %in% normal),]
+CN_tumor <- CNV_table[which(types %in% tumor),];
+CN_normal <- CNV_table[which(types %in% normal),];
 
 
 # Change ID to match with other data-types
@@ -69,37 +70,59 @@ GeneRegions <- function (genelist) {
   
   #From Malin, get all genes and the Granges positions stored in 'genelistgranges'
   mart <- "ensembl"
-  ensembl <- useEnsembl(biomart="ensembl", dataset="hsapiens_gene_ensembl")
+  ensembl <- useEnsembl(biomart="ensembl", dataset="hsapiens_gene_ensembl") # OBS !!! What version was used for the annotation? Default GRCh38  
   ensemblgenes <- getBM(attributes=c('ensembl_gene_id', 'hgnc_symbol', 'chromosome_name','start_position','end_position'), mart = ensembl)
+  
+  xidx <- which(ensemblgenes[,3]=="X")
+  yidx <- which(ensemblgenes[,3]=="Y")
+  ensemblgenes[xidx, 2] <- 23
+  ensemblgenes[yidx, 2] <- 24
+  
   genelistgranges <- GRanges(seqnames=ensemblgenes$chromosome_name, ranges=IRanges(ensemblgenes$start_position, ensemblgenes$end_position), hgnc_symbol=ensemblgenes$hgnc_symbol
                              ,ensemble_gene_id = ensemblgenes$ensembl_gene_id)
-  keeplist <- c(1:22,"X","Y")
+  
+  
+
+  keeplist <- c(1:24)
   tokeep<- keeplist[which(keeplist %in% levels(factor(seqnames(genelistgranges))))]
   genelistgranges<- keepSeqlevels(genelistgranges,tokeep, pruning.mode="coarse")
   
 }
  
+
+
+
+GenelistGrange <- GeneRegions()
   
-  
-  
-  
-  
-  
-  
-  
-   #Way to large file for my computer to handle
-  tab5rows <- read.table("mRNA.geneEXP.tsv", header = TRUE, nrows = 2)
-  classes <- sapply(tab5rows, class)
-  #tabAll <- read.table("mRNA.geneEXP.tsv", header = TRUE, colClasses = classes)
+# function that finds all proteins in the potential_loss regions for each indivdual
+#####  Subject = Potenital_loss
+#####  Query   = GeneList
+#hits returned indices over which samples have deleted genes.
+hits <- findOverlaps(GenelistGrange,potential_loss, type="within")  
+ 
+ 
+potential_loss <- potential_loss[subjectHits(hits)]
+potential_loss@elementMetadata$DeletedGene <- GenelistGrange[queryHits(hits)]@elementMetadata$ensemble_gene_id
+#GenelistGrange[queryHits(hits)]$ensemble_gene_id  Gets all the gene id:s
+
+#in total 12692 unique genes over all samples
+
+
+#---------------------------------m-RNA section ------------------------------------------
+ 
+#Way to large file for my computer to handle
+#tab5rows <- read.table("mRNA.geneEXP.tsv", header = TRUE, nrows = 2)
+#classes <- sapply(tab5rows, class)
+#tabAll <- read.table("mRNA.geneEXP.tsv", header = TRUE, colClasses = classes)
 
 
 
 
 
 #
-mRNA_table <- read.table("mRNA.geneEXP.tsv", header=TRUE,sep = "\t", nrows=2)
-library(readr)
-tab100 <- read_tsv('mRNA.geneEXP.tsv',n_max=100)
+#mRNA_table <- read.table("mRNA.geneEXP.tsv", header=TRUE,sep = "\t", nrows=2)
+#library(readr)
+#tab100 <- read_tsv('mRNA.geneEXP.tsv',n_max=100)
 
 
 
