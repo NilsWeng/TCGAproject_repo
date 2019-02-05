@@ -103,9 +103,34 @@ hits <- findOverlaps(GenelistGrange,potential_loss, type="within")
  
 potential_loss <- potential_loss[subjectHits(hits)]
 potential_loss@elementMetadata$DeletedGene <- GenelistGrange[queryHits(hits)]@elementMetadata$ensemble_gene_id
-#GenelistGrange[queryHits(hits)]$ensemble_gene_id  Gets all the gene id:s
+
+
+# Sort the potential_loss object
+
+potential_loss <- sortSeqlevels(potential_loss)
+potential_loss <- sort(potential_loss, by = ~  Sample + seqnames)
 
 #in total 12692 unique genes over all samples
+
+#-----------------Search if any of the potential_loss candidate genes are found in list of known mutational signatures genes------------
+
+
+#geneINmutlist takes a GRange obejct with genes and match it agains list of potential mutsign genes and returns matching genes as GRange object
+geneINmutlist <- function(GrangeObject){
+  
+  
+  
+  mutsign_genes <- read.table("mutsign_genes.csv",header=TRUE,sep=";")
+
+  indices <- potential_loss@elementMetadata$DeletedGene %in% mutsign_genes$Gene.ID
+  found_genes <- potential_loss[indices]
+  
+  return (found_genes)
+  
+}
+
+found_genes <- geneINmutlist(potential_loss)
+
 
 
 #---------------------------------m-RNA section ------------------------------------------
