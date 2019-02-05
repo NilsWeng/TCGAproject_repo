@@ -132,6 +132,21 @@ geneINmutlist <- function(GrangeObject){
 found_genes <- geneINmutlist(potential_loss)
 
 
+#---------------------------------------MC3-MAF sectio -----------------------------------
+
+#setwd("C:/Users/Nils_/OneDrive/Skrivbord/Data")
+#MC3_DF <- read.table('mc3.v0.2.8.PUBLIC.maf.gz',header=TRUE,sep='\t',nrow=200)
+
+
+
+
+
+
+
+
+
+
+
 
 #---------------------------------m-RNA section ------------------------------------------
  
@@ -142,13 +157,38 @@ found_genes <- geneINmutlist(potential_loss)
 
 
 
-
+# Contains 11070 columns i.e one for each patient 
+#format TCGA-BL-A13J-11A-13R-A10U-07
 
 #
 #mRNA_table <- read.table("mRNA.geneEXP.tsv", header=TRUE,sep = "\t", nrows=2)
-#library(readr)
-#tab100 <- read_tsv('mRNA.geneEXP.tsv',n_max=100)
+library(readr)
+tab100 <- read_tsv('mRNA.geneEXP.tsv',n_max=4)
+looking_for_gene <- c("?|100134869","?|10357") # test-vector for script
+looking_for_patient <- c("TCGA-A13J-11A","TCGA-A5JA-01A")
+M <- matrix(c(looking_for_gene,looking_for_patient),ncol=2)
+colnames(M) <- (c("DeletedGene","Sample"))
+tab100_hits <- tab100[tab100$gene_id %in% M[,1],]
+name_vector <- names(tab100_hits)
+#grep("TCGA-[0-9A-Z]*-[0-9A-Z]*",name_vector)
+name_vector[2:length(name_vector)] <- gsub("-[0-9A-Z]*-[0-9A-Z]*-[0-9A-Z]*-[0-9A-Z]*","",name_vector[2:length(name_vector)])
 
+#rowMeans(tab100[, -(1)],na.rm=TRUE)
+# Problem sample ID is expressed in long format in the mRNA file <- Fix this !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+
+row_mean <- rowMeans(tab100_hits[, -(1)],na.rm=TRUE)
+#sample_expression <- 
+intervall <- 1:length(tab100_hits$gene_id)
+for (i in intervall) {
+  
+  A <- M[i,'Sample']
+  expression <- tab100_hits[i,A]
+  p_val <- expression / row_mean[i]
+  
+}
+
+# Want to find the expression level given a sample and ENSGnumber
 
 
 
