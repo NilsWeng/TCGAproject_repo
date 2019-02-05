@@ -57,11 +57,11 @@ CN_tumor_Grange<-df2Grange(CN_tumor)
 potential_loss <- CN_tumor_Grange[CN_tumor_Grange@elementMetadata$Segment_Mean < -2,]
 
 
-#Find all genes that are expressed in these regions
+#Find all genes that are expressed in these regions (Script from Malin)
 
+GeneRegions <- function (genelist) {
+  
 
-  
-  
   suppressPackageStartupMessages(library(GenomicRanges))
   suppressPackageStartupMessages(library(biomaRt))
   suppressPackageStartupMessages(library(BSgenome))
@@ -71,14 +71,26 @@ potential_loss <- CN_tumor_Grange[CN_tumor_Grange@elementMetadata$Segment_Mean <
   mart <- "ensembl"
   ensembl <- useEnsembl(biomart="ensembl", dataset="hsapiens_gene_ensembl")
   ensemblgenes <- getBM(attributes=c('ensembl_gene_id', 'hgnc_symbol', 'chromosome_name','start_position','end_position'), mart = ensembl)
-  genelistgranges <- GRanges(seqnames=ensemblgenes$chromosome_name, ranges=IRanges(ensemblgenes$start_position, ensemblgenes$end_position), hgnc_symbol=ensemblgenes$hgnc_symbol)
+  genelistgranges <- GRanges(seqnames=ensemblgenes$chromosome_name, ranges=IRanges(ensemblgenes$start_position, ensemblgenes$end_position), hgnc_symbol=ensemblgenes$hgnc_symbol
+                             ,ensemble_gene_id = ensemblgenes$ensembl_gene_id)
   keeplist <- c(1:22,"X","Y")
   tokeep<- keeplist[which(keeplist %in% levels(factor(seqnames(genelistgranges))))]
   genelistgranges<- keepSeqlevels(genelistgranges,tokeep, pruning.mode="coarse")
   
-
-
-
+}
+ 
+  
+  
+  
+  
+  
+  
+  
+  
+   #Way to large file for my computer to handle
+  tab5rows <- read.table("mRNA.geneEXP.tsv", header = TRUE, nrows = 2)
+  classes <- sapply(tab5rows, class)
+  #tabAll <- read.table("mRNA.geneEXP.tsv", header = TRUE, colClasses = classes)
 
 
 
@@ -87,7 +99,7 @@ potential_loss <- CN_tumor_Grange[CN_tumor_Grange@elementMetadata$Segment_Mean <
 #
 mRNA_table <- read.table("mRNA.geneEXP.tsv", header=TRUE,sep = "\t", nrows=2)
 library(readr)
-read_tsv('mRNA.geneEXP.tsv',n_max=100)
+tab100 <- read_tsv('mRNA.geneEXP.tsv',n_max=100)
 
 
 
