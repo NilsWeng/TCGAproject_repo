@@ -9,12 +9,10 @@ df2Grange <- function(dfName){
   suppressPackageStartupMessages(library("GenomicRanges"))
   
   GRange_object <- GRanges(seqnames =  dfName$Chromosome,
-                         ranges=IRanges(dfName$Start,dfName$End),
-                         strand='*',
-                         
-                         Num_Probes=dfName$Num_Probes,
-                         Segment_Mean=dfName$Segment_Mean,
-                         Sample=dfName$Sample)
+                           ranges=IRanges(dfName$Start,dfName$End),
+                           strand='*',
+                           Segment_Mean=dfName$Segment_Mean,
+                           Sample=dfName$Sample)
   
   return (GRange_object)
   
@@ -22,48 +20,27 @@ df2Grange <- function(dfName){
 }
 
 
-# try to compare the different data tables with my original
-#CNV_table[,1] <- gsub("-[0-9A-Z]*-[0-9A-Z]*-01$", "", CNV_table[,1])
-#B<-CNV_table[CNV_table$Sample == "TCGA-OR-A5KQ-01A",]
 
-#readCNVs('PANCAN_SNP.seg')
-CNV_table <- read.table('PANCAN_CNV.seg',header = TRUE)
-#CNV_table <- read.table('Xena-GDC-PANCAN.masked_cnv.tsv',header = TRUE)
+CNV_table <- read.table('Xena-GDC-PANCAN.masked_cnv.tsv',header = TRUE)
 
 # Extract what sample types are in the SNP_table
-types <- gsub("TCGA-[A-Z0-9]*-[A-Z0-9]*-", "", (gsub("[A-Z]*-[0-9A-Z]*-[0-9A-Z]*-01$", "", CNV_table[,1])))
-unique(types)
-
-
-
-# What types match to
-#normal <- c("10A", "10B", "11A", "11B")
-#tumor <- c("01A", "01B", "06A")
-tumor <- c("01","06","02","05")
-normal <- c("10","11","12","14")
-
-CN_tumor <- CNV_table[which(types %in% tumor),];
-CN_normal <- CNV_table[which(types %in% normal),];
-
-
-# Change ID to match with other data-types
-CN_tumor[,1] <- gsub("-[0-9A-Z]*-[0-9A-Z]*-[0-9A-Z]*-01$", "", CN_tumor[,1])
-CN_normal[,1] <- gsub("-[0-9A-Z]*-[0-9A-Z]*-[0-9A-Z]*-01$", "", CN_normal[,1])
+#types <- gsub("TCGA-[A-Z0-9]*-[A-Z0-9]*-", "", (gsub("[A-Z]*-[0-9A-Z]*-[0-9A-Z]*-01$", "", CNV_table[,1])))
+#unique(types)
 
 
 # Convert CN_tumor into GRange object
 
-CN_tumor_Grange<-df2Grange(CN_tumor)
+CNV_Grange<-df2Grange(CNV_table)
 
 # Find all segments where the Segment_Mean < -2
-potential_loss <- CN_tumor_Grange[CN_tumor_Grange@elementMetadata$Segment_Mean < -2,]
+potential_loss <- CNV_Grange[CNV_Grange@elementMetadata$Segment_Mean < -2,]
 
 
 #Find all genes that are expressed in these regions (Script from Malin)
 
 GeneRegions <- function (genelist) {
   
-
+  
   suppressPackageStartupMessages(library(GenomicRanges))
   suppressPackageStartupMessages(library(biomaRt))
   suppressPackageStartupMessages(library(BSgenome))
@@ -83,25 +60,25 @@ GeneRegions <- function (genelist) {
                              ,ensemble_gene_id = ensemblgenes$ensembl_gene_id)
   
   
-
+  
   keeplist <- c(1:24)
   tokeep<- keeplist[which(keeplist %in% levels(factor(seqnames(genelistgranges))))]
   genelistgranges<- keepSeqlevels(genelistgranges,tokeep, pruning.mode="coarse")
   
 }
- 
+
 
 
 
 GenelistGrange <- GeneRegions()
-  
+
 # function that finds all proteins in the potential_loss regions for each indivdual
 #####  Subject = Potenital_loss
 #####  Query   = GeneList
 #hits returned indices over which samples have deleted genes.
 hits <- findOverlaps(GenelistGrange,potential_loss, type="within")  
- 
- 
+
+
 potential_loss <- potential_loss[subjectHits(hits)]
 potential_loss@elementMetadata$DeletedGene <- GenelistGrange[queryHits(hits)]@elementMetadata$ensemble_gene_id
 
@@ -122,7 +99,7 @@ geneINmutlist <- function(GrangeObject){
   
   
   mutsign_genes <- read.table("mutsign_genes.csv",header=TRUE,sep=";")
-
+  
   indices <- potential_loss@elementMetadata$DeletedGene %in% mutsign_genes$Gene.ID
   found_genes <- potential_loss[indices]
   
@@ -150,7 +127,7 @@ found_genes <- geneINmutlist(potential_loss)
 
 
 #---------------------------------m-RNA section ------------------------------------------
- 
+
 #Way to large file for my computer to handle
 #tab5rows <- read.table("mRNA.geneEXP.tsv", header = TRUE, nrows = 2)
 #classes <- sapply(tab5rows, class)
@@ -164,65 +141,30 @@ found_genes <- geneINmutlist(potential_loss)
 #
 #mRNA_table <- read.table("mRNA.geneEXP.tsv", header=TRUE,sep = "\t", nrows=2)
 library(readr)
-tab100_hits <- read_tsv('mRNA.geneEXP.tsv')
+tab100 <- read_tsv('mRNA.geneEXP.tsv',n_max=4)
+looking_for_gene <- c("?|100134869","?|10357") # test-vector for script
+looking_for_patient <- c("TCGA-A13J-11A","TCGA-A5JA-01A")
+M <- matrix(c(looking_for_gene,looking_for_patient),ncol=2)
+colnames(M) <- (c("DeletedGene","Sample"))
+tab100_hits <- tab100[tab100$gene_id %in% M[,1],]
 name_vector <- names(tab100_hits)
-name_vector[2:length(name_vector)] <- gsub("-[0-9A-Z]*-[0-9A-Z]*-[0-9A-Z]*-[0-9A-Z]*$","",name_vector[2:length(name_vector)])
-names(tab100_hits) <- name_vector
+#grep("TCGA-[0-9A-Z]*-[0-9A-Z]*",name_vector)
+name_vector[2:length(name_vector)] <- gsub("-[0-9A-Z]*-[0-9A-Z]*-[0-9A-Z]*-[0-9A-Z]*","",name_vector[2:length(name_vector)])
+
+#rowMeans(tab100[, -(1)],na.rm=TRUE)
+# Problem sample ID is expressed in long format in the mRNA file <- Fix this !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 
-
-# Subset where only genes found in found_genes are selected
-#tab100_hits <- tab100[tab100$gene_id %in% M[,1],]
-#name_vector <- names(tab100_hits)
-#name_vector[2:length(name_vector)] <- gsub("-[0-9A-Z]*-[0-9A-Z]*-[0-9A-Z]*-[0-9A-Z]*$","",name_vector[2:length(name_vector)])
-#names(tab100_hits) <- name_vector
-
-# Get sample expression and avarage expression for candidates aswell as expression/avarage as P: Returns(exp,avg_exp,P)
-
-get_gene_expression <- function(Gene_id,Sample_id){
+row_mean <- rowMeans(tab100_hits[, -(1)],na.rm=TRUE)
+#sample_expression <- 
+intervall <- 1:length(tab100_hits$gene_id)
+for (i in intervall) {
   
-  col_name = Sample_id
-  row_name = Gene_id
-  T <- tab100_hits$gene_id == row_name
-  A <- (tab100_hits[T ,])
-  
-  
-  expression <- as.numeric(A[, col_name])
-  
-
-  
-  avg_expression <-  as.numeric(rowMeans(A[, -(1)],na.rm=TRUE))
-  
-  P <- expression/avg_expression
-  return_vector <- c(expression,avg_expression,P)
-  #colnames(return_vector) <- c('exp','avg_exp')
-  return(return_vector)
+  A <- M[i,'Sample']
+  expression <- tab100_hits[i,A]
+  p_val <- expression / row_mean[i]
   
 }
-
-###TEST SECTION------------------------------------------------------
-#Should give 66.9 and 2,287
-
-
-X <- c("TCGA-OR-A5J6","TCGA-OR-A5J8")
-Y <- c("?|10357","?|100134869")
-M <- cbind(X,Y)
-
-get_gene_expression("BRCA2|675","TCGA-KD-A5QS")
-get_gene_expression("PMS2|5395","TCGA-13-15OO")
-# Do get_gene_expression to each 
-mapply(get_gene_expression,Y,X)
-###--------------------------------------------------------------------------
-##### Problem -- gene_id expressed as ?|1001~
-
-
-Sample_id <- found_genes$Sample
-gene_id <- found_genes$DeletedGene
-
-mapply(get_gene_expression,gene_id,Sample_id)
-
-
-
 
 # Want to find the expression level given a sample and ENSGnumber
 
