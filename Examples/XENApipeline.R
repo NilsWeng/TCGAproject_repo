@@ -22,10 +22,8 @@ df2Grange <- function(dfName){
 
 
 CNV_table <- read.table('Xena-GDC-PANCAN.masked_cnv.tsv',header = TRUE)
-
-# Extract what sample types are in the SNP_table
-#types <- gsub("TCGA-[A-Z0-9]*-[A-Z0-9]*-", "", (gsub("[A-Z]*-[0-9A-Z]*-[0-9A-Z]*-01$", "", CNV_table[,1])))
-#unique(types)
+#xidx <- which(CNV_table$Chromosome=="X")
+#CNV_table[xidx , 2] <- 23
 
 
 # Convert CN_tumor into GRange object
@@ -34,6 +32,79 @@ CNV_Grange<-df2Grange(CNV_table)
 
 # Find all segments where the Segment_Mean < -2
 potential_loss <- CNV_Grange[CNV_Grange@elementMetadata$Segment_Mean < -2,]
+
+
+###--------------------------------Plotting CNVs section ---------------------------------------
+
+library(gaia)
+library(TCGAbiolinks)
+
+#gaiaCNVplot(CNV_table[, 2:5],threshold = 0.5)
+
+
+
+CNV_table <- CNV_table[CNV_table$Sample == 'TCGA-23-1023-01R' ,]
+
+
+
+
+
+plot_CN <- function(CN_table){
+  
+  Chromo <- CNV_table$Chromosome
+  CN <- CNV_table$Segment_Mean
+  start <- CNV_table$Start
+  end <- CNV_table$End
+  
+  
+  
+  plot (CN,
+        ylim = c(-3, max(abs(CNV_table$Segment_Mean)+2)),
+        type = "h",
+        col = "red",
+        xlab = "Chromosome",
+        ylab = "Segment_mean",
+        xaxt = "n")
+  
+  
+  
+  uni.chr <- unique(Chromo)
+  temp <- rep(0, length(uni.chr))
+  for (i in 1:length(uni.chr)) {
+    temp[i] <- max(which(uni.chr[i] == Chromo))
+  }
+  for (i in 1:length(temp)) {
+    abline(v = temp[i], col = "black", lty = "dashed")
+  }
+  nChroms <- length(uni.chr)
+  begin <- c()
+  for (d in 1:nChroms) {
+    chrom <- sum(Chromo == uni.chr[d])
+    begin <- append(begin, chrom)
+  }
+  temp2 <- rep(0, nChroms)
+  for (i in 1:nChroms) {
+    if (i == 1) {
+      temp2[1] <- (begin[1] * 0.5)
+    }
+    else if (i > 1) {
+      temp2[i] <- temp[i - 1] + (begin[i] * 0.5)
+    }
+  }
+  
+  uni.chr[uni.chr==23] <- "X"
+  uni.chr[uni.chr==24] <- "Y"
+  for (i in 1:length(temp)) {
+    axis(1, at = temp2[i], labels = uni.chr[i], cex.axis = 1)
+  }
+  legend(x=1,y=max(Calls[,"score"]+2), y.intersp=0.8, c("Amp"), pch=15, col=c("red"), text.font=3)
+  legend(x=1,y=-max(Calls[,"score"]+0.5), y.intersp=0.8, c("Del"), pch=15, col=c("blue"), text.font=3)
+  
+}
+
+
+plot_CN(CNV_table)
+
 
 
 #Find all genes that are expressed in these regions (Script from Malin)
