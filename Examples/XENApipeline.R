@@ -26,12 +26,14 @@ CNV_table <- read.table('Xena-GDC-PANCAN.masked_cnv.tsv',header = TRUE)
 #CNV_table[xidx , 2] <- 23
 
 
+
+
 # Convert CN_tumor into GRange object
 
 CNV_Grange<-df2Grange(CNV_table)
 
 # Find all segments where the Segment_Mean < -2
-potential_loss <- CNV_Grange[CNV_Grange@elementMetadata$Segment_Mean < -2,]
+potential_loss <- CNV_Grange[CNV_Grange@elementMetadata$Segment_Mean < -1,]
 
 
 ###--------------------------------Plotting CNVs section ---------------------------------------
@@ -103,7 +105,7 @@ plot_CN <- function(CN_table){
 }
 
 
-plot_CN(CNV_table)
+#plot_CN(CNV_table)
 
 
 
@@ -151,8 +153,8 @@ hits <- findOverlaps(GenelistGrange,potential_loss, type="within")
 
 
 potential_loss <- potential_loss[subjectHits(hits)]
-potential_loss@elementMetadata$DeletedGene <- GenelistGrange[queryHits(hits)]@elementMetadata$ensemble_gene_id
-
+potential_loss@elementMetadata$DeletedGene <- GenelistGrange[queryHits(hits)]@elementMetadata$ensemble_gene_id  # Change between HGNC or ensemble
+potential_loss@elementMetadata$DeletedGeneHGNC <- GenelistGrange[queryHits(hits)]@elementMetadata$hgnc_symbol
 
 # Sort the potential_loss object
 
@@ -199,45 +201,86 @@ found_genes <- geneINmutlist(potential_loss)
 
 #---------------------------------m-RNA section ------------------------------------------
 
-#Way to large file for my computer to handle
-#tab5rows <- read.table("mRNA.geneEXP.tsv", header = TRUE, nrows = 2)
-#classes <- sapply(tab5rows, class)
-#tabAll <- read.table("mRNA.geneEXP.tsv", header = TRUE, colClasses = classes)
-
-
-
 # Contains 11070 columns i.e one for each patient 
 #format TCGA-BL-A13J-11A-13R-A10U-07
 
-#
-#mRNA_table <- read.table("mRNA.geneEXP.tsv", header=TRUE,sep = "\t", nrows=2)
+
 library(readr)
-tab100 <- read_tsv('mRNA.geneEXP.tsv',n_max=4)
-looking_for_gene <- c("?|100134869","?|10357") # test-vector for script
-looking_for_patient <- c("TCGA-A13J-11A","TCGA-A5JA-01A")
-M <- matrix(c(looking_for_gene,looking_for_patient),ncol=2)
-colnames(M) <- (c("DeletedGene","Sample"))
-tab100_hits <- tab100[tab100$gene_id %in% M[,1],]
-name_vector <- names(tab100_hits)
-#grep("TCGA-[0-9A-Z]*-[0-9A-Z]*",name_vector)
-name_vector[2:length(name_vector)] <- gsub("-[0-9A-Z]*-[0-9A-Z]*-[0-9A-Z]*-[0-9A-Z]*","",name_vector[2:length(name_vector)])
+setwd("C:/Users/Nils_/OneDrive/Skrivbord/Data")
 
-#rowMeans(tab100[, -(1)],na.rm=TRUE)
-# Problem sample ID is expressed in long format in the mRNA file <- Fix this !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+EXP_table <- read_tsv('mRNA.geneEXP.tsv')
 
 
-row_mean <- rowMeans(tab100_hits[, -(1)],na.rm=TRUE)
-#sample_expression <- 
-intervall <- 1:length(tab100_hits$gene_id)
-for (i in intervall) {
+
+
+get_hgcn <- function(name){
   
-  A <- M[i,'Sample']
-  expression <- tab100_hits[i,A]
-  p_val <- expression / row_mean[i]
-  
+  name <-  strsplit(name, "\\|")[[1]][1]
+  return (name)
 }
+
+hgcn_Name <- sapply(EXP_table$gene_id,get_hgcn)
+unname(hgcn_Name)
+EXP_table$gene_id <- hgcn_Name
+
+
+#Filter for gene-expression that was found in found_genes
+EXP_hits <- EXP_table[EXP_table$gene_id %in% found_genes$DeletedGeneHGNC ,]
+
+
+
+
+name_vector <- names(EXP_hits)
+name_vector[2:length(name_vector)] <- gsub("-[0-9A-Z]*-[0-9A-Z]*-[0-9A-Z]*$","",name_vector[2:length(name_vector)])
+names(EXP_hits) <- name_vector
+
+
+
 
 # Want to find the expression level given a sample and ENSGnumber
 
+get_gene_expression <- function(Gene_id,Sample_id){
+  
+  
+  #col_name ="TCGA-OR-A5J3-01A"
+  #row_name = "PMS2"
+  
+  
+  col_name = Sample_id
+  row_name = Gene_id
+  T <- EXP_hits$gene_id == row_name
+  A <- (EXP_hits[T ,])
+  
+  
+  expression <- as.numeric(A[, col_name])
+  
+  
+  
+  avg_expression <-  as.numeric(rowMeans(A[, -(1)],na.rm=TRUE))
+  
+  P <- expression/avg_expression
+  return_vector <- c(expression,avg_expression,P)
+  names(return_vector) <- c('exp','avg_exp',"P")
+  return(return_vector)
+  
+}
 
+
+sample_id <- as.vector(found_genes$Sample)
+
+gene_id <- found_genes$DeletedGeneHGNC
+
+DF <- data.frame(sample_id,gene_id)
+
+#Crashes because not all samples are present in both.
+DF <- DF[DF$sample_id %in% names(EXP_hits),]
+
+##################### Matrix is not correct, some samples are not present in names(EXP_hits) that are found in found_genes$sample
+######checked for  %in% and selected those , however i think the got shifted and its all wrong
+
+
+
+Matrix <- as.data.frame(mapply(get_gene_expression,DF$gene_id,as.vector(DF$sample_id)))
+colnames(Matrix) <- paste(as.vector(DF$sample_id),DF$gene_id, sep= "<-->")
+Matrix
 
