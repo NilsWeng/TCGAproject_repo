@@ -219,20 +219,20 @@ get_hgcn <- function(name){
   return (name)
 }
 
-hgcn_Name <- sapply(EXP_table$gene_id,get_hgcn)
-unname(hgcn_Name)
-EXP_table$gene_id <- hgcn_Name
+hgcn_Name <- sapply(EXP_table$gene_id,get_hgcn);
+unname(hgcn_Name);
+EXP_table$gene_id <- hgcn_Name;
 
 
 #Filter for gene-expression that was found in found_genes
-EXP_hits <- EXP_table[EXP_table$gene_id %in% found_genes$DeletedGeneHGNC ,]
+EXP_hits <- EXP_table[EXP_table$gene_id %in% found_genes$DeletedGeneHGNC ,];
 
 
 
 
-name_vector <- names(EXP_hits)
-name_vector[2:length(name_vector)] <- gsub("-[0-9A-Z]*-[0-9A-Z]*-[0-9A-Z]*$","",name_vector[2:length(name_vector)])
-names(EXP_hits) <- name_vector
+name_vector <- names(EXP_hits);
+name_vector[2:length(name_vector)] <- gsub("-[0-9A-Z]*-[0-9A-Z]*-[0-9A-Z]*$","",name_vector[2:length(name_vector)]);
+names(EXP_hits) <- name_vector;
 
 
 
@@ -266,21 +266,30 @@ get_gene_expression <- function(Gene_id,Sample_id){
 }
 
 
-sample_id <- as.vector(found_genes$Sample)
+sample_id <- as.vector(found_genes$Sample);
 
-gene_id <- found_genes$DeletedGeneHGNC
+gene_id <- found_genes$DeletedGeneHGNC;
 
-DF <- data.frame(sample_id,gene_id)
+DF <- data.frame(sample_id,gene_id);
 
-#Crashes because not all samples are present in both.
-DF <- DF[DF$sample_id %in% names(EXP_hits),]
+#Crashes because not all samples are present in both. Checked two samples , these didnt have gene expression data (from GBM)
+DF <- DF[DF$sample_id %in% names(EXP_hits),];
+
+
+# Try remove the normal/tumor sample type end. Does not add or remove hits!
+#sample_id_short <- gsub("-[0-9A-Z]*$","",sample_id)
+#EXP_names_short <- names(EXP_hits[, -1])
+#EXP_names_short <- gsub("-[0-9A-Z]*$","",EXP_names_short)
+#DF_short <- sample_id_short[!(sample_id_short %in% EXP_names_short)]
+#length(DF_short)
+
 
 ##################### Matrix is not correct, some samples are not present in names(EXP_hits) that are found in found_genes$sample
 ######checked for  %in% and selected those , however i think the got shifted and its all wrong
 
 
 
-Matrix <- as.data.frame(mapply(get_gene_expression,DF$gene_id,as.vector(DF$sample_id)))
-colnames(Matrix) <- paste(as.vector(DF$sample_id),DF$gene_id, sep= "<-->")
-Matrix
+result_Matrix <- as.data.frame(mapply(get_gene_expression,DF$gene_id,as.vector(DF$sample_id)))
+colnames(result_Matrix) <- paste(as.vector(DF$sample_id),DF$gene_id, sep= "<-->")
+result_Matrix
 
