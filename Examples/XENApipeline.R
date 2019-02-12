@@ -206,6 +206,7 @@ found_genes <- geneINmutlist(potential_loss)
 
 
 library(readr)
+
 setwd("C:/Users/Nils_/OneDrive/Skrivbord/Data")
 
 EXP_table <- read_tsv('mRNA.geneEXP.tsv')
