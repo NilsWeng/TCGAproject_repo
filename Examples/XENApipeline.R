@@ -1,8 +1,8 @@
 #Test of handling pancan TCGA data
-rm(list=ls())
-setwd("C:/Users/Nils_/OneDrive/Skrivbord/Data")
+rm(list=ls());
+setwd("C:/Users/Nils_/OneDrive/Skrivbord/Data");
 
-library(nilsTCGA)
+library(nilsTCGA);
 
 
 df2Grange <- function(dfName){
@@ -38,14 +38,14 @@ potential_loss <- CNV_Grange[CNV_Grange@elementMetadata$Segment_Mean < -1,]
 
 ###--------------------------------Plotting CNVs section ---------------------------------------
 
-library(gaia)
-library(TCGAbiolinks)
+#library(gaia)
+#library(TCGAbiolinks)
 
 #gaiaCNVplot(CNV_table[, 2:5],threshold = 0.5)
 
 
 
-CNV_table <- CNV_table[CNV_table$Sample == 'TCGA-23-1023-01R' ,]
+#CNV_table <- CNV_table[CNV_table$Sample == 'TCGA-23-1023-01R' ,]
 
 
 
