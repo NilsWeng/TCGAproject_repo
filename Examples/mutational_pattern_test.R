@@ -34,6 +34,8 @@ end_time <- Sys.time()
 print("Read time")
 end_time - start_time
 
+
+#Add Study.abbrevation to the MC3_DF matrix.
 MC3_DF$TSS.Code <-gsub("-[A-Z0-9]*-[A-Z0-9]*-[A-Z0-9]*-[A-Z0-9]*-[A-Z0-9]*$","",gsub("TCGA-","",MC3_DF$Tumor_Sample_Barcode))
 MC3_DF <- join(MC3_DF,TSS2Study_DF, by="TSS.Code")
 
@@ -122,6 +124,15 @@ for (cancerType in MC3_DF_CancerType){ # Loop over all cancer types
 
 
 
+cohort <- data.frame("vcf"=vcffile, "subtype"=subtype, "sample"=sample)
+
+#Count number of mutations and add to cohort table
+setwd("C:/Users/Nils_/OneDrive/Skrivbord/Data/MC3/VCF_files")
+library(R.utils)
+nmut_total <- sapply(cohort$vcf,countLines)-1
+cohort$nmut <- nmut_total
+
+
 
 #END OF LOOPS----------------------------------------------
 
@@ -174,14 +185,8 @@ for (cancerType in MC3_DF_CancerType) {
 
 
 
-cohort <- data.frame("vcf"=vcffile, "subtype"=subtype, "sample"=sample)
 
-#Count number of mutations and add to cohort table
-library(R.utils)
-nmut_total=sapply(cohort$vcf,countLines)-1
-cohort$nmut <- nmut_total
 
-#sum(cohort[cohort$subtype=="OV",]$nmut)
 
 
 
@@ -226,9 +231,9 @@ dev.off()
 
 #Open VCF-files and transform into G-ranges object-----------------------------------------------
 
-library(MutationalPatterns)
+#library(MutationalPatterns)
 
-setwd("C:/Users/Nils_/OneDrive/Skrivbord/Data/MC3/VCF_files")
+#setwd("C:/Users/Nils_/OneDrive/Skrivbord/Data/MC3/VCF_files")
 
 
 auto = extractSeqlevelsByGroup(species="Homo_sapiens", 
@@ -237,16 +242,24 @@ auto = extractSeqlevelsByGroup(species="Homo_sapiens",
 
 
 
-vcf_file_list <- list.files(path="C:/Users/Nils_/OneDrive/Skrivbord/Data/MC3/VCF_files",recursive=TRUE,pattern=".vcf")
-read_vcfs_as_granges(cohort_table$vcf,cohort_table$sample,ref_genome)
-
 
 
 
 ########## ---- Mutational signatures for each sample for one cancer type  #######
+
+setwd("C:/Users/Nils_/OneDrive/Skrivbord/Data/MC3")
+#Load cosmic signature from file.
+cosmic_signatures <- as.matrix(read.table("cosmic_signatures.txt",header=TRUE))
+
 setwd("C:/Users/Nils_/OneDrive/Skrivbord/Data/MC3/VCF_files")
 
 
+#list_of_cancers <- as.vector(unique(cohort$subtype))
+#for (cancer_type in list_of_cancers){}
+
+
+
+#Single run!
 
 file_list <- as.character(cohort$vcf[which(cohort$subtype %in% "OV")])
 name_list <- as.character(cohort$sample[which(cohort$subtype %in% "OV")])
@@ -272,11 +285,16 @@ if (FALSE){
 
 
 
+
+
+#Set wd for saving pictures
+directory_name <- paste("C:/Users/Nils_/OneDrive/Skrivbord/Data/MC3/Pictures","/","OV",sep="") 
+#crate folder if it doesnt exist
+ifelse(!dir.exists(file.path(directory_name)), dir.create(file.path(directory_name)), FALSE)
+print (directory_name)
+setwd(directory_name)
 #Plot results of signature extraction
-
-setwd("C:/Users/Nils_/OneDrive/Skrivbord/Data/MC3/Pictures/OV")
-
-pdf("mut_signatures_OV1.pdf")
+pdf("mut_signatures_OV.pdf")
 plot_96_profile(mut_signatures_OV$signatures,condensed = TRUE)
 dev.off()
 pdf("extracted_contribution.pdf") # Mayby plot in chunks of 100? Hard to see anything
@@ -284,35 +302,43 @@ plot_contribution(mut_signatures_OV$contribution, mut_signatures_OV$signature, m
 dev.off()
 
 
-#Compare similarity of extracted results to Cosmic signatures
 
 
-#Download Cosmic-signatures
-sp_url <- paste("https://cancer.sanger.ac.uk/cancergenome/assets/",
-                 "signatures_probabilities.txt", sep = "")
-cosmic_signatures = read.table(sp_url, sep = "\t", header = TRUE)
+
+################Download Cosmic-signatures or just use the cosmic_signature.txt file
+
+#sp_url <- paste("https://cancer.sanger.ac.uk/cancergenome/assets/","signatures_probabilities.txt", sep = "")
+#cosmic_signatures = read.table(sp_url, sep = "\t", header = TRUE)
 # Match the order of the mutation types to MutationalPatterns standard
-new_order = match(row.names(mut_matrix_OV), cosmic_signatures$Somatic.Mutation.Type)
-# Reorder cancer signatures dataframe
-cosmic_signatures = cosmic_signatures[as.vector(new_order),]
+#new_order = match(row.names(mut_matrix_OV), cosmic_signatures$Somatic.Mutation.Type)
+# Reorder cosmic signatures dataframe
+#cosmic_signatures = cosmic_signatures[as.vector(new_order),]
 # Add trinucletiode changes names as row.names
-row.names(cosmic_signatures) = cosmic_signatures$Somatic.Mutation.Type
+#row.names(cosmic_signatures) = cosmic_signatures$Somatic.Mutation.Type
 # Keep only 96 contributions of the signatures in matrix
-cosmic_signatures = as.matrix(cosmic_signatures[,4:33])
-
+#cosmic_signatures = as.matrix(cosmic_signatures[,4:33])
+##save as cosmic_signatures.txt
+#write.table(cosmic_signatures, file="cosmic_signatures.txt", row.names=TRUE, col.names=TRUE)
+#cosmic_signatures <- read.table()
 
 
 #Similarity between cosmic_signatures and mut_matrix_OV
 cos_sim_samples_signatures <- cos_sim_matrix(mut_matrix_OV, cosmic_signatures)
 
+#Test to remove sample-barcode for cleaner plot
+rownames(cos_sim_samples_signatures) <- c(1:nrow(cos_sim_samples_signatures))
+
 
 hclust_cosmic = cluster_signatures(cosmic_signatures, method = "average")
 cosmic_order = colnames(cosmic_signatures)[hclust_cosmic$order]
 
+
+pdf("Cosine_heatmap.pdf")
+
 plot_cosine_heatmap(cos_sim_samples_signatures,
                      col_order = cosmic_order,
                      cluster_rows = TRUE)
-
+dev.off()
 
 
 #Reconstruct mut_matrix_OV by linear combination of cosmic_signatures
@@ -320,12 +346,14 @@ plot_cosine_heatmap(cos_sim_samples_signatures,
 fit_res <- fit_to_signatures(mut_matrix_OV, cosmic_signatures)
 select <- which(rowSums(fit_res$contribution) > 10)
 #Plot contribution barplot
+
+pdf("Reconstructed_mut_matrix_from_cosmic_signatures.pdf")
 plot_contribution(fit_res$contribution[select,],
                        cosmic_signatures[,select],
                        coord_flip = FALSE,
                        mode = "absolute")
 
-
+dev.off()
 
 ##########---------------------------------------------------------------------
 

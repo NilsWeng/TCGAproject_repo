@@ -36,7 +36,7 @@ for (s in 1:length(subtypes)){
     outfile=paste(t,".vcf", sep="")
     outfile=paste(subtypes[s], outfile, sep="/")
     write.table(vcfdata, file=outfile, row.names=FALSE, sep="\t", quote=FALSE)
-    vcffile <- c(vcffile, outfile)
+    vcffile <- c(vcffile,paste("/",outfile,sep="") outfile)
   }
   subtype <- c(subtype, rep(subtypes[s], length(tumors)))
 }
