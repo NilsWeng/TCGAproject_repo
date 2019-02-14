@@ -24,20 +24,28 @@ ref_genome = "BSgenome.Hsapiens.UCSC.hg19"
 
 
 
-
 start_time <- Sys.time()
 
 
-MC3_DF <- fread('mc3.v0.2.8.PUBLIC.maf.gz',nrow=100000)
+MC3_DF <- fread('mc3.v0.2.8.PUBLIC.maf.gz') #<- run for entire file
 
 end_time <- Sys.time()
 print("Read time")
 end_time - start_time
 
 
+#Select only necessary columns to save memory
+library(dplyr)
+MC3_DF <- select(MC3_DF, Chromosome,Tumor_Seq_Allele2,Tumor_Sample_Barcode,Start_Position,Reference_Allele)
+
+
+
+
 #Add Study.abbrevation to the MC3_DF matrix.
 MC3_DF$TSS.Code <-gsub("-[A-Z0-9]*-[A-Z0-9]*-[A-Z0-9]*-[A-Z0-9]*-[A-Z0-9]*$","",gsub("TCGA-","",MC3_DF$Tumor_Sample_Barcode))
 MC3_DF <- join(MC3_DF,TSS2Study_DF, by="TSS.Code")
+
+
 
 #MC3_DF <- read.table('mc3.v0.2.8.PUBLIC.code.maf',header=TRUE,sep='\t',nrow=200);
 
@@ -111,7 +119,7 @@ for (cancerType in MC3_DF_CancerType){ # Loop over all cancer types
       vcfdata[,3]=as.character(sample_id)
       outfile <- paste(sample_id,".vcf", sep="")
       #outfile = paste(directory_name,outfile, sep="/")
-      write.table(vcfdata, file=outfile, row.names=FALSE, sep="\t", quote=FALSE)
+      #write.table(vcfdata, file=outfile, row.names=FALSE, sep="\t", quote=FALSE)
       
       subtype <- c(subtype,as.character(unique(cancerType$Study.Abbreviation)))
       sample <- c(sample,as.character(sample_id))
@@ -131,7 +139,7 @@ setwd("C:/Users/Nils_/OneDrive/Skrivbord/Data/MC3/VCF_files")
 library(R.utils)
 nmut_total <- sapply(cohort$vcf,countLines)-1
 cohort$nmut <- nmut_total
-
+write.table(cohort,"cohort.txt") # new code
 
 
 #END OF LOOPS----------------------------------------------
@@ -164,7 +172,7 @@ for (cancerType in MC3_DF_CancerType) {
   
   cancer_abb <- unique(cancerType$Study.Abbreviation);
   vcfdata <- matrix(".", nrow=nrow(cancerType), ncol = 10);
-  columns=c("#CHROM", "POS", "ID", "REF", "ALT", "QUAL", "FILTER", "INFO", "FORMAT", "WHAT??" )
+  columns=c("#CHROM", "POS", "ID", "REF", "ALT", "QUAL", "FILTER", "INFO", "FORMAT", as.character(cancerType$Tumor_Sample_Barcode) )
   colnames(vcfdata) <- columns
   
   vcfdata[,1]=as.character(cancerType$Chromosome)
@@ -173,11 +181,11 @@ for (cancerType in MC3_DF_CancerType) {
   vcfdata[,5]=as.character(cancerType$Tumor_Seq_Allele2)
   vcfdata[,9]="GT"
   vcfdata[,10]="1/0"
-  vcfdata[,3]=as.character(cancerType$Tumor_Sample_Barcode)
+  #vcfdata[,3]=as.character(cancerType$Tumor_Sample_Barcode)
   
   outfile <- paste(cancer_abb,".cohort.vcf", sep="")
   #outfile = paste(directory_name,outfile, sep="/")
-  write.table(vcfdata, file=outfile, row.names=FALSE, sep="\t", quote=FALSE)
+ # write.table(vcfdata, file=outfile, row.names=FALSE, sep="\t", quote=FALSE)
   
 
   
@@ -199,7 +207,14 @@ for (cancerType in MC3_DF_CancerType) {
 setwd("C:/Users/Nils_/OneDrive/Skrivbord/Data/MC3/VCF_files")
 
 vcf_cohort_list <- list.files(path="C:/Users/Nils_/OneDrive/Skrivbord/Data/MC3/VCF_files",recursive=TRUE,pattern="cohort.vcf")
+
+#Optional: Select only certain cancertypes
+vcf_cohort_list <- vcf_cohort_list[gsub("/.*","",vcf_cohort_list) %in% c('CHOL')] 
+
 name_cohort <- gsub("/.*","",vcf_cohort_list)
+
+
+
 
 #Read each cohort.vcf file as Grange oject
 cohort_vcfs <- read_vcfs_as_granges(vcf_cohort_list,name_cohort,ref_genome)
