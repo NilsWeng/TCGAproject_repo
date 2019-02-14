@@ -116,7 +116,7 @@ for (cancerType in MC3_DF_CancerType){ # Loop over all cancer types
       vcfdata[,5]=as.character(Sample$Tumor_Seq_Allele2)
       vcfdata[,9]="GT"
       vcfdata[,10]="1/0"
-      vcfdata[,3]=as.character(sample_id)
+      #vcfdata[,3]=as.character(sample_id)
       outfile <- paste(sample_id,".vcf", sep="")
       #outfile = paste(directory_name,outfile, sep="/")
       #write.table(vcfdata, file=outfile, row.names=FALSE, sep="\t", quote=FALSE)
@@ -139,7 +139,7 @@ setwd("C:/Users/Nils_/OneDrive/Skrivbord/Data/MC3/VCF_files")
 library(R.utils)
 nmut_total <- sapply(cohort$vcf,countLines)-1
 cohort$nmut <- nmut_total
-write.table(cohort,"cohort.txt") # new code
+#write.table(cohort,"cohort.txt") # new code
 
 
 #END OF LOOPS----------------------------------------------
