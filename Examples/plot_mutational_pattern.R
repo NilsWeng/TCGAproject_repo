@@ -119,9 +119,14 @@ Cohort <- read.table("cohort.txt",header = TRUE)#maybe unness could just aswell 
 
 
 #loop over each cancer type
-
-
 cancer_list <- as.vector(unique(Cohort$subtype))
+
+
+
+#Alter what cancer types you want to loop over
+not_in = head(cancer_list,29)
+cancer_list <- cancer_list[!(cancer_list %in% not_in)]
+
 
 
 for (cancer_type in cancer_list){
@@ -143,8 +148,8 @@ for (cancer_type in cancer_list){
   print("creating mutational matrix")
   mutational_matrix = mut_matrix(cancer_vcfs,ref_genome)
   #Write only TCGA Patient ID
-  colnames(mutational_matrix) <- gsub("-[A-Z0-9]*-[A-Z0-9]*-[A-Z0-9]*-[A-Z0-9]*$","",(gsub("TCGA-[A-Z0-9]*-","",colnames(mutational_matrix))))
-  
+  colnames(mutational_matrix) <- gsub("-[A-Z0-9]*-[A-Z0-9]*-[A-Z0-9]*$","",(gsub("TCGA-[A-Z0-9]*-","",colnames(mutational_matrix))))
+  colnames(mutational_matrix)
   #Optinal find best rank
   if (FALSE){
     
@@ -166,6 +171,7 @@ for (cancer_type in cancer_list){
   print("Extracting signatures")
   
   extracted_sign = extract_signatures(mutational_matrix, number_of_signatures) 
+  print("Made it past extracting")
   colnames(extracted_sign$signatures) <- c(1:number_of_signatures)
   rownames(extracted_sign$contribution) <- c(1:number_of_signatures)
   
@@ -197,9 +203,27 @@ for (cancer_type in cancer_list){
   print(plot_cosine_heatmap(cosine_similarity, col_order = cosmic_order, cluster_rows = TRUE))
  
   
+
+  #Ugly plot for studies with many patients
+
+  k_vector <- c(1:length(VCF_files_to_read))
+  
+  while (length(k_vector) > 0) {
+    
+    interval_to_plot <- head(k_vector,100)
+    print(plot_contribution(extracted_sign$contribution, extracted_sign$signature,
+                      mode = "absolute", coord_flip = TRUE,index = interval_to_plot))
+    
+    
+    k_vector <- k_vector[! (k_vector %in% interval_to_plot) ]
+    
+  }
+  
+  
+  
   
   #Plot contribution of extracted signature vs cancer
-  print(plot_contribution(extracted_sign$contribution, extracted_sign$signature, mode = "absolute", coord_flip = TRUE))
+  #print(plot_contribution(extracted_sign$contribution, extracted_sign$signature, mode = "absolute", coord_flip = TRUE))
  
   
   #Plot contribution of cosmic vs cancer
@@ -211,12 +235,26 @@ for (cancer_type in cancer_list){
   
   # Plot contribution barplot
   
-
-  print(plot_contribution(fit_res$contribution[select,],
-                    cosmic_signatures[,select],
-                    coord_flip = TRUE,
-                    mode = "absolute"))
+  #Ugly plot for studies with many patients
   
+ 
+  k_vector <- c(1:length(VCF_files_to_read))
+  
+  while (length(k_vector) > 0) {
+    
+    interval_to_plot <- head(k_vector,100)
+    print(plot_contribution(fit_res$contribution[select,],
+                            cosmic_signatures[,select],
+                            coord_flip = TRUE,
+                            mode = "absolute",
+                            index = interval_to_plot))
+    
+    
+    k_vector <- k_vector[! (k_vector %in% interval_to_plot) ]
+    
+  }
+  
+
 
   
   
@@ -226,8 +264,12 @@ for (cancer_type in cancer_list){
   #Similarity between cosmic_signatures and mut_matrix
   cos_sim_samples_cosmic <- cos_sim_matrix(mutational_matrix, cosmic_signatures)
  
+  #error NA/NaN/Inf in foreign function call #2835-03B
+  #cos_sim_s amples_cosmic[which(cos_sim_samples_cosmic == 0.0000000000)] <- 0.0000000001
   
   
+  
+  #######CRAAAAAAASSSSSSSSSSSH here
   print(plot_cosine_heatmap(cos_sim_samples_cosmic,
                       col_order = cosmic_order,
                       cluster_rows = TRUE))
@@ -241,23 +283,50 @@ for (cancer_type in cancer_list){
   
   
   
-  dev.off()
   
+  
+  
+  
+  #Save-Data as R object
+  setwd("C:/Users/Nils_/OneDrive/Skrivbord/Data/MC3/generated_data")
+  
+  #Create folder for saving data and set wd
+  directory_name <- paste("C:/Users/Nils_/OneDrive/Skrivbord/Data/MC3/generated_data","/",cancer_type,sep="") 
+  
+  #crate folder if it doesnt exist
+  ifelse(!dir.exists(file.path(directory_name)), dir.create(file.path(directory_name)), FALSE)
+  setwd(directory_name)
+  
+  save(mutational_matrix,file="mut_mat.rda")
+  save(extracted_sign, file=paste("extracted_sign_",number_of_signatures,".rda",sep = ""))
   
   #Calculate number of mutations for each sample.
   #Does not get the same as the cohort$mutations -> why? 
-  
   Number_of_mutation <- cancer_vcfs@unlistData@ranges@NAMES
   Number_of_mutation <- count(Number_of_mutation)
   colnames(Number_of_mutation) <- c("Sample_id","#mutations")
   table_name <- paste(cancer_type,"_number_of_mutations.txt")
-  
-  setwd("C:/Users/Nils_/OneDrive/Skrivbord/Data/MC3/#mutations")
   write.table(Number_of_mutation,table_name,row.names = FALSE)
   
+  #Plot mutation distribution
   
   
-  break() #turn on if you want to try only one sample
+  d <- density(Number_of_mutation$`#mutations`)
+  
+  print(plot(d, type="n", main="Distribution of mutations")
+        ,polygon(d, col="lightgray", border="gray")
+        ,rug(Number_of_mutation$`#mutations`, col="red"))
+  
+  
+  
+
+  
+  
+  
+  dev.off()
+  
+  
+  #break() #turn on if you want to try only one sample
   
 }
 
