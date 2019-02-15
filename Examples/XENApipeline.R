@@ -19,9 +19,19 @@ df2Grange <- function(dfName){
   
 }
 
-#test
+
 
 CNV_table <- read.table('Xena-GDC-PANCAN.masked_cnv.tsv',header = TRUE)
+
+#Remove all segments that have the same starting position???
+#CNV_table1 <- CNV_table[, 1:3]
+#CNV_table <- CNV_table[!duplicated(CNV_table1),]
+
+
+
+#CNV_table <- read.table('PANCAN_CNV.seg',header = TRUE)
+
+
 #xidx <- which(CNV_table$Chromosome=="X")
 #CNV_table[xidx , 2] <- 23
 
@@ -122,14 +132,17 @@ GeneRegions <- function (genelist) {
   #From Malin, get all genes and the Granges positions stored in 'genelistgranges'
   mart <- "ensembl"
   ensembl <- useEnsembl(biomart="ensembl", dataset="hsapiens_gene_ensembl") # OBS !!! What version was used for the annotation? Default GRCh38  
-  ensemblgenes <- getBM(attributes=c('ensembl_gene_id', 'hgnc_symbol', 'chromosome_name','start_position','end_position'), mart = ensembl)
+  ensemblgenes <- getBM(attributes=c('ensembl_gene_id', 'hgnc_symbol', 'chromosome_name',
+                                     'start_position','end_position'), mart = ensembl)
   
   xidx <- which(ensemblgenes[,3]=="X")
   yidx <- which(ensemblgenes[,3]=="Y")
   ensemblgenes[xidx, 2] <- 23
   ensemblgenes[yidx, 2] <- 24
   
-  genelistgranges <- GRanges(seqnames=ensemblgenes$chromosome_name, ranges=IRanges(ensemblgenes$start_position, ensemblgenes$end_position), hgnc_symbol=ensemblgenes$hgnc_symbol
+  genelistgranges <- GRanges(seqnames=ensemblgenes$chromosome_name,
+                             ranges=IRanges(ensemblgenes$start_position, ensemblgenes$end_position),
+                             hgnc_symbol=ensemblgenes$hgnc_symbol
                              ,ensemble_gene_id = ensemblgenes$ensembl_gene_id)
   
   
@@ -153,15 +166,48 @@ hits <- findOverlaps(GenelistGrange,potential_loss, type="within")
 
 
 potential_loss <- potential_loss[subjectHits(hits)]
-potential_loss@elementMetadata$DeletedGene <- GenelistGrange[queryHits(hits)]@elementMetadata$ensemble_gene_id  # Change between HGNC or ensemble
+potential_loss@elementMetadata$DeletedGene <- GenelistGrange[queryHits(hits)]@elementMetadata$ensemble_gene_id 
 potential_loss@elementMetadata$DeletedGeneHGNC <- GenelistGrange[queryHits(hits)]@elementMetadata$hgnc_symbol
+
 
 # Sort the potential_loss object
 
 potential_loss <- sortSeqlevels(potential_loss)
 potential_loss <- sort(potential_loss, by = ~  Sample + seqnames)
 
+
+
 #in total 12692 unique genes over all samples
+
+
+#Troubleshooting - why are there duplications
+
+
+
+if (false) {
+  
+  library(plyr)
+  Test <- paste(potential_loss$Sample,potential_loss$DeletedGene,sep ="")
+  Test1 <- paste(potential_loss$Sample,potential_loss$DeletedGeneHGNC,sep ="")
+  
+  #on ensemble id
+  c_Test <- count(Test)
+  c_Test <- c_Test[ (c_Test$freq > 1) ,]
+  
+  result <- potential_loss[potential_loss$Sample == "TCGA-DX-A7EL-01A" , ]
+  
+  
+  hit <- potential_loss$Sample ==  "TCGA-DX-A7EL-01A"
+  
+  potential_loss[hit]
+  
+  
+  
+}
+
+
+
+
 
 #-----------------Search if any of the potential_loss candidate genes are found in list of known mutational signatures genes------------
 
@@ -183,7 +229,7 @@ geneINmutlist <- function(GrangeObject){
 found_genes <- geneINmutlist(potential_loss)
 
 
-#---------------------------------------MC3-MAF sectio -----------------------------------
+#---------------------------------------MC3-MAF section -----------------------------------
 
 #setwd("C:/Users/Nils_/OneDrive/Skrivbord/Data")
 #MC3_DF <- read.table('mc3.v0.2.8.PUBLIC.maf.gz',header=TRUE,sep='\t',nrow=200)
@@ -227,6 +273,8 @@ EXP_table$gene_id <- hgcn_Name;
 
 #Filter for gene-expression that was found in found_genes
 EXP_hits <- EXP_table[EXP_table$gene_id %in% found_genes$DeletedGeneHGNC ,];
+#remove duplicated samples.
+EXP_hits <-  EXP_hits[, !duplicated(colnames(EXP_hits))]
 
 
 
@@ -240,28 +288,55 @@ names(EXP_hits) <- name_vector;
 
 # Want to find the expression level given a sample and ENSGnumber
 
+#read TSS2study file needed for TSS code -> Cancer type
+setwd("C:/Users/Nils_/OneDrive/Skrivbord/Data/MC3");
+TSS2Study <- read.table("TSS2Studyabb.txt",header = TRUE)
+#Create vector of studytype matching EXP_hits
+library(dplyr)
+library(plyr)
+TSS_vector <- as.data.frame(gsub("TCGA-","",gsub("-[A-Z0-9]*-[A-Z0-9]*$","",colnames(EXP_hits[2:length(EXP_hits)]))))
+colnames(TSS_vector) <- "TSS.Code"
+TSS_vector <- join(TSS_vector,TSS2Study, by = "TSS.Code")
+TSS_vector <- as.vector(TSS_vector[,2])
+
+
+
+
 get_gene_expression <- function(Gene_id,Sample_id){
   
   
-  #col_name ="TCGA-OR-A5J3-01A"
-  #row_name = "PMS2"
+  #Sample_id ="TCGA-OR-A5J1-01A"
+  #Gene_id = "BRCA1"
   
   
-  col_name = Sample_id
-  row_name = Gene_id
-  T <- EXP_hits$gene_id == row_name
-  A <- (EXP_hits[T ,])
+  #col_name = Sample_id
+  #row_name = Gene_id
+  
+  #Find sample cancertype
+  sample_type <- gsub("TCGA-","",gsub("-[A-Z0-9]*-[A-Z0-9]*$","",Sample_id))
+  #Translate sample_type to cancer_type
+  sample_type <- as.vector(TSS2Study[TSS2Study$TSS.Code %in% sample_type ,]$Study.Abbreviation)
+  sample_type
   
   
-  expression <- as.numeric(A[, col_name])
   
   
+  selected_rows <- EXP_hits[(EXP_hits$gene_id %in% Gene_id) ,]
   
-  avg_expression <-  as.numeric(rowMeans(A[, -(1)],na.rm=TRUE))
+  #Get sample expression
+  expression <- as.numeric(selected_rows[, Sample_id])
   
-  P <- expression/avg_expression
-  return_vector <- c(expression,avg_expression,P)
-  names(return_vector) <- c('exp','avg_exp',"P")
+  #Get avg expression for that cancertype
+  colnames(selected_rows) <- c("gene_id",TSS_vector)
+  selected_rows <- selected_rows[,(colnames(selected_rows) %in% sample_type)]
+  
+  
+  avg_expression_cancer <-  as.numeric(rowMeans(selected_rows,na.rm=TRUE))
+  
+  
+  P <- expression/avg_expression_cancer
+  return_vector <- c(expression,avg_expression_cancer,P)
+  names(return_vector) <- c('exp','avg_exp_cancer',"P")
   return(return_vector)
   
 }
@@ -292,5 +367,22 @@ DF <- DF[DF$sample_id %in% names(EXP_hits),];
 
 result_Matrix <- as.data.frame(mapply(get_gene_expression,DF$gene_id,as.vector(DF$sample_id)))
 colnames(result_Matrix) <- paste(as.vector(DF$sample_id),DF$gene_id, sep= "<-->")
+
+#remove duplicated results
+result_Matrix <- result_Matrix[, !duplicated(colnames(result_Matrix))]
 result_Matrix
 
+
+
+
+
+
+#Plot P against copynumber
+
+
+
+
+
+#names(EXP_hits)[duplicated(names(EXP_hits))]
+
+#EXP_hits2 <-  EXP_hits[, !duplicated(colnames(EXP_hits))]
