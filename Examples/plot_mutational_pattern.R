@@ -121,11 +121,11 @@ Cohort <- read.table("cohort.txt",header = TRUE)#maybe unness could just aswell 
 #loop over each cancer type
 cancer_list <- as.vector(unique(Cohort$subtype))
 
-
+cancer_list <- cancer_list[!cancer_list %in% "LAML" ]
 
 #Alter what cancer types you want to loop over
-not_in = head(cancer_list,29)
-cancer_list <- cancer_list[!(cancer_list %in% not_in)]
+#not_in = head(cancer_list,29)
+#cancer_list <- cancer_list[!(cancer_list %in% not_in)]
 
 
 

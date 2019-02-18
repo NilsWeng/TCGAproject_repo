@@ -24,11 +24,13 @@ CNV_table$Study_abb <- cancer_abb_vector
 
 
 
-#########PROBLEM WITH LOTS OF NA IN SELECTED CNV_TABLE
+
 
 
 #Make subset of CNV_table for certain cancertype
-CNV_table1 <- CNV_table[CNV_table$Study_abb == "ACC" ,]
+selected_cancer <- "ACC"
+CNV_table <- CNV_table[CNV_table$Study_abb %in% "ACC" ,]
+
 
 
 #Make a GRange object 
@@ -58,7 +60,7 @@ GeneRegions <- function (genelist) {
   suppressPackageStartupMessages(library(GenomicRanges))
   suppressPackageStartupMessages(library(biomaRt))
   suppressPackageStartupMessages(library(BSgenome))
-  suppressPackageStartupMessages(library("BSgenome.Hsapiens.UCSC.hg19", character.only = TRUE))
+  suppressPackageStartupMessages(library("BSgenome.Hsapiens.UCSC.hg38", character.only = TRUE))
   
   #From Malin, get all genes and the Granges positions stored in 'genelistgranges'
   mart <- "ensembl"
@@ -97,4 +99,142 @@ CNV_Grange_Genes <- CNV_Grange[subjectHits(hits)]
 CNV_Grange_Genes@elementMetadata$DeletedGene <- GenelistGrange[queryHits(hits)]@elementMetadata$ensemble_gene_id 
 CNV_Grange_Genes@elementMetadata$DeletedGeneHGNC <- GenelistGrange[queryHits(hits)]@elementMetadata$hgnc_symbol
 
+
+
+# Gene expression ---------------------------------------------------------
+
+
+library(readr)
+
+setwd("C:/Users/Nils_/OneDrive/Skrivbord/Data")
+
+EXP_table <- as.data.frame(read_tsv('mRNA.geneEXP.tsv'))
+
+
+get_hgcn <- function(name){
+  
+  name <-  strsplit(name, "\\|")[[1]][1]
+  return (name)
+}
+
+hgcn_Name <- sapply(EXP_table$gene_id,get_hgcn);
+unname(hgcn_Name);
+EXP_table$gene_id <- hgcn_Name;
+
+#Shorter TCGA-barcode
+colnames(EXP_table) <- c("gene_id",gsub("-[A-Z0-9]*-[A-Z0-9]*-[A-Z0-9]*$","",colnames(EXP_table)[2:length(colnames(EXP_table))]))
+
+
+#Select only genes in changed segments
+EXP_hits <- EXP_table[EXP_table$gene_id %in% CNV_Grange_Genes$DeletedGeneHGNC ,];
+
+#Add rownames as gene_id and remove gene_id as column
+row.names(EXP_hits) <- EXP_hits$gene_id
+EXP_hits <- EXP_hits[, !colnames(EXP_hits) == "gene_id"]
+
+
+#translate TSS into cancer type
+TSS_vector <- colnames(EXP_hits)
+TSS_vector <- gsub("-[A-Z0-9]*-[A-Z0-9]*$","",TSS_vector)
+TSS_vector <- gsub("TCGA-","",TSS_vector)
+TSS_vector <- as.data.frame(TSS_vector)
+colnames(TSS_vector) <- "TSS.Code"
+
+setwd("C:/Users/Nils_/OneDrive/Skrivbord/Data/MC3");
+TSS2Study <- read.table("TSS2Studyabb.txt",header = TRUE)
+#Create vector of studytype matching EXP_hits
+library(dplyr)
+library(plyr)
+
+
+
+TSS_vector <- join(TSS_vector,TSS2Study, by = "TSS.Code")
+TSS_vector <- as.vector(TSS_vector[,2])
+
+#Select only samples from selected_cancer type.
+EXP_hits <- EXP_hits[TSS_vector %in% selected_cancer] 
+
+
+#EXP hits now only contain relevant rows and colums
+
+
+
+
+#Get gene expression given a sample_id and Gene_id
+
+get_gene_expression <- function(Gene_id,Sample_id){
+  
+  
+  #Sample_id ="TCGA-OR-A5J1-01A"
+  #Gene_id = "A1BG"
+  
+
+  selected_rows <- EXP_hits[(rownames(EXP_hits) %in% Gene_id) ,]
+  
+  #Get sample expression
+  expression <- as.numeric(selected_rows[, Sample_id])
+  
+  #Get avg expression for that cancertype
+  
+  
+  avg_expression_cancer <- as.numeric(rowMeans(selected_rows,na.rm = TRUE))
+  
+  #avg_expression_cancer <- as.numeric(AVG_expression_cancer[row.names(AVG_expression_cancer) == Gene_id ,])
+  
+  
+  P <- as.numeric(expression/avg_expression_cancer)
+  return_vector <- c(P)
+  names(return_vector) <- c("P")
+  return(return_vector)
+  
+}
+
+
+sample_id <- as.vector(CNV_Grange_Genes$Sample);
+gene_id <- CNV_Grange_Genes$DeletedGeneHGNC;
+segment_mean <- CNV_Grange_Genes$Segment_Mean
+
+DF <- data.frame(sample_id,gene_id,segment_mean);
+
+#Since matching on hgnc lots of rows are missing hgnc symbol(but have entrez id)
+DF <-  DF[!DF$gene_id == "" , ]
+
+#Crashes because not all samples are present in both. Checked two samples , these didnt have gene expression data (from GBM)
+DF <- DF[DF$sample_id %in% colnames(EXP_hits) ,];
+DF <- DF[DF$gene_id %in% rownames(EXP_hits) ,];
+
+DF <- na.omit(DF)
+
+#get gene expression for these samples.
+#DF_B <- DF
+#Test reducing DF size
+
+DF <- DF[ (DF$segment_mean < -0.5) ,]
+DF <- sample_n(DF, 5000)
+#DF <- DF[1:100 ,]
+
+
+
+
+#result_Matrix <- as.data.frame(mapply(get_gene_expression,DF$gene_id,as.vector(DF$sample_id)))
+DF$P <- mapply(get_gene_expression,DF$gene_id,as.vector(DF$sample_id))
+
+#Save DF
+#setwd("C:/Users/Nils_/OneDrive/Skrivbord/Data/log2vsP")
+#save(DF,)
+#DF$CN <- (2^DF$segment_mean)* 2
+
+#Plot log2 vs P
+plot(DF$segment_mean,DF$P,
+     xlab = "log2(CN/2)",
+     ylab = "Expression/Avg Expression")
+
+
+#Correlation
+cor.test(DF$segment_mean,DF$P)
+
+#colnames(result_Matrix) <- paste(as.vector(DF$sample_id),DF$gene_id, sep= "<-->")
+#remove duplicated results
+#result_Matrix <- result_Matrix[, !duplicated(colnames(result_Matrix))]
+#result_Matrix
 
