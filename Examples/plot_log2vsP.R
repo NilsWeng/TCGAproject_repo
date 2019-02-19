@@ -29,7 +29,7 @@ CNV_table$Study_abb <- cancer_abb_vector
 
 #Make subset of CNV_table for certain cancertype
 selected_cancer <- "ACC"
-CNV_table <- CNV_table[CNV_table$Study_abb %in% "ACC" ,]
+CNV_table <- CNV_table[CNV_table$Study_abb %in% selected_cancer ,]
 
 
 
@@ -65,7 +65,7 @@ GeneRegions <- function (genelist) {
   #From Malin, get all genes and the Granges positions stored in 'genelistgranges'
   mart <- "ensembl"
   ensembl <- useEnsembl(biomart="ensembl", dataset="hsapiens_gene_ensembl") # OBS !!! What version was used for the annotation? Default GRCh38  
-  ensemblgenes <- getBM(attributes=c('ensembl_gene_id', 'hgnc_symbol', 'chromosome_name',
+  ensemblgenes <- getBM(attributes=c('ensembl_gene_id', 'hgnc_symbol',"entrezgene", 'chromosome_name',
                                      'start_position','end_position'), mart = ensembl)
   
   xidx <- which(ensemblgenes[,3]=="X")
@@ -75,7 +75,8 @@ GeneRegions <- function (genelist) {
   
   genelistgranges <- GRanges(seqnames=ensemblgenes$chromosome_name,
                              ranges=IRanges(ensemblgenes$start_position, ensemblgenes$end_position),
-                             hgnc_symbol=ensemblgenes$hgnc_symbol
+                             hgnc_symbol=ensemblgenes$hgnc_symbol,
+                             entrezgene = ensemblgenes$entrezgene
                              ,ensemble_gene_id = ensemblgenes$ensembl_gene_id)
   
   
@@ -98,8 +99,14 @@ hits <- findOverlaps(GenelistGrange,CNV_Grange, type="within")
 CNV_Grange_Genes <- CNV_Grange[subjectHits(hits)]
 CNV_Grange_Genes@elementMetadata$DeletedGene <- GenelistGrange[queryHits(hits)]@elementMetadata$ensemble_gene_id 
 CNV_Grange_Genes@elementMetadata$DeletedGeneHGNC <- GenelistGrange[queryHits(hits)]@elementMetadata$hgnc_symbol
+CNV_Grange_Genes@elementMetadata$DeletedGeneEntrez <- GenelistGrange[queryHits(hits)]@elementMetadata$entrezgene
 
 
+#A <- as.vector(CNV_Grange_Genes@elementMetadata$DeletedGene)
+# <- as.vector(CNV_Grange_Genes@elementMetadata$DeletedGeneHGNC)
+#C <- as.vector(CNV_Grange_Genes@elementMetadata$DeletedGeneEntrez)
+
+#test <- data.frame(A,B,C)
 
 # Gene expression ---------------------------------------------------------
 
@@ -160,8 +167,8 @@ EXP_hits <- EXP_hits[TSS_vector %in% selected_cancer]
 
 
 
-#Get gene expression given a sample_id and Gene_id
 
+#Get gene expression given a sample_id and Gene_id
 get_gene_expression <- function(Gene_id,Sample_id){
   
   
@@ -190,13 +197,15 @@ get_gene_expression <- function(Gene_id,Sample_id){
 }
 
 
+
+
 sample_id <- as.vector(CNV_Grange_Genes$Sample);
 gene_id <- CNV_Grange_Genes$DeletedGeneHGNC;
 segment_mean <- CNV_Grange_Genes$Segment_Mean
 
 DF <- data.frame(sample_id,gene_id,segment_mean);
 
-#Since matching on hgnc lots of rows are missing hgnc symbol(but have entrez id)
+#Since matching on hgnc lots of rows are missing hgnc symbol(but have ensembl id)
 DF <-  DF[!DF$gene_id == "" , ]
 
 #Crashes because not all samples are present in both. Checked two samples , these didnt have gene expression data (from GBM)
@@ -209,8 +218,13 @@ DF <- na.omit(DF)
 #DF_B <- DF
 #Test reducing DF size
 
-DF <- DF[ (DF$segment_mean < -0.5) ,]
-DF <- sample_n(DF, 5000)
+DF <- DF[ (DF$segment_mean < -0) ,]
+
+
+
+
+#Make a random sampling from all genes
+DF <- sample_n(DF, 50000)
 #DF <- DF[1:100 ,]
 
 
@@ -218,6 +232,8 @@ DF <- sample_n(DF, 5000)
 
 #result_Matrix <- as.data.frame(mapply(get_gene_expression,DF$gene_id,as.vector(DF$sample_id)))
 DF$P <- mapply(get_gene_expression,DF$gene_id,as.vector(DF$sample_id))
+#NAN values when there is no expression in any of the samples (since 0/0)
+
 
 #Save DF
 #setwd("C:/Users/Nils_/OneDrive/Skrivbord/Data/log2vsP")
@@ -225,8 +241,8 @@ DF$P <- mapply(get_gene_expression,DF$gene_id,as.vector(DF$sample_id))
 #DF$CN <- (2^DF$segment_mean)* 2
 
 #Plot log2 vs P
-plot(DF$segment_mean,DF$P,
-     xlab = "log2(CN/2)",
+plot(-DF$segment_mean,DF$P,
+     xlab = "-log2(CN/2)",
      ylab = "Expression/Avg Expression")
 
 
@@ -238,3 +254,13 @@ cor.test(DF$segment_mean,DF$P)
 #result_Matrix <- result_Matrix[, !duplicated(colnames(result_Matrix))]
 #result_Matrix
 
+library(ggplot2)
+
+scatter_plot <- ggplot(DF, aes(segment_mean, P))
+scatter_plot + geom_point() + labs(x = "- log2(CN/2)", y = "Expression/AVG expression (within cancer)") + 
+  ggtitle("ACC 50k genes")
+  #+  geom_smooth(method="auto")
+
+
+scatter_plot <- ggplot(DF, aes(segment_mean, log(P)))
+scatter_plot + geom_point() + labs(x = "- log2(CN/2)", y = "log(Expression/AVG expression (within cancer))") 
