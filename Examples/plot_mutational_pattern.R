@@ -348,16 +348,48 @@ setwd("C:/Users/Nils_/OneDrive/Skrivbord/Data/MC3/VCF_files")
 vcf_list <- list.files(path="C:/Users/Nils_/OneDrive/Skrivbord/Data/MC3/VCF_files",recursive=TRUE,pattern=".vcf")
 
 #Unselect cohort.vcf files
-#vcf_list <- vcf_list[grep("cohort",vcf_list,invert = TRUE)]
-vcf_list <- vcf_list[grep("cohort",vcf_list)]
+vcf_list <- vcf_list[grep("cohort",vcf_list,invert = TRUE)]
+#vcf_list <- vcf_list[grep("cohort",vcf_list)]
 
 vcf_list_names <- gsub(".vcf","",gsub("[A-Z0-9]*/","",vcf_list))
 
 
 
+#############-------------------------------------------------------------------------------
+#Select subgroup with high mutation-number.
+setwd("C:/Users/Nils_/OneDrive/Skrivbord/Data/MC3/generated_data")
+mut_list <- list.files(path="C:/Users/Nils_/OneDrive/Skrivbord/Data/MC3/generated_data",recursive=TRUE,pattern="number_of_mutations.txt")
+
+#Open each mutation list file and select samplenames with certain number of mutations.
+
+number_mut_DF <- data.frame()
+
+for (mut_file in mut_list) {
+  
+  
+  file_df <- read.table(mut_file,header=TRUE)
+  file_df$study_abb <- gsub("/..*","",mut_file)
+  
+  number_mut_DF <-rbind(number_mut_DF,file_df)
+  
+  
+}
+
+
+number_mut_DF <- number_mut_DF[number_mut_DF$X.mutations >= 2000 ,]
+
+
+#Trim vcf_list for only high mutation samples
+
+vcf_list <- vcf_list[vcf_list_names %in% number_mut_DF$Sample_id]
+vcf_list_names <- gsub(".vcf","",gsub("[A-Z0-9]*/","",vcf_list))
+setwd("C:/Users/Nils_/OneDrive/Skrivbord/Data/MC3/VCF_files")
+
+#################################--------------------------------------------------------------------
+
+
+
 #Read vcf-files and save as R object.
-
-
 start_time <- Sys.time()
 
 print("Reading all vcfs")
@@ -382,6 +414,14 @@ print("creating mutational matrix")
 mutational_matrix = mut_matrix(all_vcfs,ref_genome)
 save(mutational_matrix,file="all_mut_matrix.rda")
 
+colnames(mutational_matrix) <- number_mut_DF$study_abb ####################For having cancer abb as names
+for (i in 1:length(colnames(mutational_matrix))) {
+  
+  colnames(mutational_matrix)[i]<- paste(colnames(mutational_matrix)[i],i,sep="-")
+  
+}
+
+
 #Find optimal rank
 library(NMF)
 #Add pseudocount to mut matrix ?
@@ -392,36 +432,131 @@ plot(estim.r)
 
 
 #Clear workspace 
-rm(all_vcfs,vcf_list,vcf_list_names)
+#rm(all_vcfs,vcf_list,vcf_list_names)
 #Extract signatures
-
 number_of_signatures <- 4
 print("Extracting signatures")
 
 extracted_sign = extract_signatures(mutational_matrix, number_of_signatures) 
 
-save(extracted_sign, file="extracted_sign_33_tot.rda")
+colnames(extracted_sign$signatures) <- c(1:number_of_signatures)
+rownames(extracted_sign$contribution) <- c(1:number_of_signatures)
+
+save(extracted_sign, file="extracted_sign_high_mut.rda")
 print("Made it past extracting")
 
 
+colnames(extracted_sign$contribution) <- colnames(mutational_matrix) ####################For having cancer abb as name
 
 
+#Needed for comparing to cosmic
+setwd("C:/Users/Nils_/OneDrive/Skrivbord/Data/MC3")
+cosmic_signatures <- as.matrix(read.table("cosmic_signatures.txt",header=TRUE))
+#Print results
+
+#Set options here
+setwd("C:/Users/Nils_/OneDrive/Skrivbord/Data/MC3/Global_mutsign/High_mutations")
+pdf_name <- paste("High_mutation_samples.pdf")
 
 
+print_mutsign <- function() {
+  
+  pdf(pdf_name)
+  
+  #Plot extracted signatures
+  print(plot_96_profile(extracted_sign$signatures, condensed = TRUE))
+  
+  
+  
+  
+  #Compare extracted signatures with cosmic signatures
+  cosine_similarity = cos_sim_matrix(extracted_sign$signatures, cosmic_signatures)
+  # Plot heatmap with specified signature order
+  hclust_cosmic = cluster_signatures(cosmic_signatures, method = "average")
+  # store signatures in new order
+  cosmic_order = colnames(cosmic_signatures)[hclust_cosmic$order]
+  
+  print(plot_cosine_heatmap(cosine_similarity, col_order = cosmic_order, cluster_rows = TRUE))
+  
+  
+  
+  #Ugly plot for studies with many patients
+  k_vector <- c(1:length(vcf_list))
+  #k_vector <- c(1:length(VCF_files_to_read))
+  
+  while (length(k_vector) > 0) {
+    
+    interval_to_plot <- head(k_vector,100)
+    print(plot_contribution(extracted_sign$contribution, extracted_sign$signature,
+                            mode = "absolute", coord_flip = TRUE,index = interval_to_plot))
+    
+    
+    k_vector <- k_vector[! (k_vector %in% interval_to_plot) ]
+    
+  }
+  
+  
+  
+  
+  #Plot contribution of extracted signature vs cancer
+  #print(plot_contribution(extracted_sign$contribution, extracted_sign$signature, mode = "absolute", coord_flip = TRUE))
+  
+  
+  #Plot contribution of cosmic vs cancer
+  
+  fit_res <- fit_to_signatures(mutational_matrix, cosmic_signatures)
+  # Select signatures with some contribution
+  select <- which(rowSums(fit_res$contribution) > 10)
+  
+  
+  # Plot contribution barplot
+  
+  #Ugly plot for studies with many patients
+  
+  
+  k_vector <- c(1:length(vcf_list))
+  
+  while (length(k_vector) > 0) {
+    
+    interval_to_plot <- head(k_vector,100)
+    print(plot_contribution(fit_res$contribution[select,],
+                            cosmic_signatures[,select],
+                            coord_flip = TRUE,
+                            mode = "absolute",
+                            index = interval_to_plot))
+    
+    
+    k_vector <- k_vector[! (k_vector %in% interval_to_plot) ]
+    
+  }
+  
+  
+  
+  #Plot cosine mutational_matrix vs cosmic_signature
+  
+  #Similarity between cosmic_signatures and mut_matrix
+  cos_sim_samples_cosmic <- cos_sim_matrix(mutational_matrix, cosmic_signatures)
+  
+  #error NA/NaN/Inf in foreign function call #2835-03B
+  #cos_sim_s amples_cosmic[which(cos_sim_samples_cosmic == 0.0000000000)] <- 0.0000000001
+  
+  
+  
+  #######CRAAAAAAASSSSSSSSSSSH here
+  print(plot_cosine_heatmap(cos_sim_samples_cosmic,
+                            col_order = cosmic_order,
+                            cluster_rows = TRUE))
+  
+  
+  #Plot cosine mutational_matrix vs extracted_signatures
+  print(plot_contribution_heatmap(extracted_sign$contribution, cluster_samples=TRUE))
+  
+  
+  
+  dev.off()
+}
 
-
-
-
-
-
-
-
-
-
-
-
-
-
+print_mutsign()
 
 
 
