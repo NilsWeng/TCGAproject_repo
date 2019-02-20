@@ -121,7 +121,7 @@ Cohort <- read.table("cohort.txt",header = TRUE)#maybe unness could just aswell 
 #loop over each cancer type
 cancer_list <- as.vector(unique(Cohort$subtype))
 
-cancer_list <- cancer_list[!cancer_list %in% "LAML" ]
+cancer_list <- cancer_list[cancer_list %in% "ACC" ]
 
 #Alter what cancer types you want to loop over
 #not_in = head(cancer_list,29)
@@ -143,7 +143,7 @@ for (cancer_type in cancer_list){
   print("reading file")
   cancer_vcfs <- read_vcfs_as_granges(VCF_files_to_read,VCF_files_ID,ref_genome) #Gets warning messages about alternative alleles
   
-  
+  break()
   #Create mutational matrix 
   print("creating mutational matrix")
   mutational_matrix = mut_matrix(cancer_vcfs,ref_genome)
@@ -205,7 +205,7 @@ for (cancer_type in cancer_list){
   
 
   #Ugly plot for studies with many patients
-
+  k_vector <- c(1:33)
   k_vector <- c(1:length(VCF_files_to_read))
   
   while (length(k_vector) > 0) {
@@ -330,5 +330,223 @@ for (cancer_type in cancer_list){
   
 }
 
+
+
+# Total/Extract signatures from all samples at the same time --------------
+rm(list=ls())
+
+#Import needed packages
+library(MutationalPatterns)
+library(BSgenome)
+library("BSgenome.Hsapiens.UCSC.hg19", character.only = TRUE)
+library(plyr)
+#Set reference genome
+ref_genome = "BSgenome.Hsapiens.UCSC.hg19"
+
+setwd("C:/Users/Nils_/OneDrive/Skrivbord/Data/MC3/VCF_files")
+
+vcf_list <- list.files(path="C:/Users/Nils_/OneDrive/Skrivbord/Data/MC3/VCF_files",recursive=TRUE,pattern=".vcf")
+
+#Unselect cohort.vcf files
+#vcf_list <- vcf_list[grep("cohort",vcf_list,invert = TRUE)]
+vcf_list <- vcf_list[grep("cohort",vcf_list)]
+
+vcf_list_names <- gsub(".vcf","",gsub("[A-Z0-9]*/","",vcf_list))
+
+
+
+#Read vcf-files and save as R object.
+
+
+start_time <- Sys.time()
+
+print("Reading all vcfs")
+
+all_vcfs <- read_vcfs_as_granges(vcf_list,vcf_list_names,ref_genome)
+
+print("Done reading all vcfs!!!!!!!")
+
+
+end_time <- Sys.time()
+print("Read time")
+end_time - start_time
+
+
+#Save the all_vcfs object
+setwd("C:/Users/Nils_/OneDrive/Skrivbord/Data/MC3/Global_mutsign")
+save(all_vcfs,file="all_vcfs.rda")
+
+
+#Extract mutational matrix
+print("creating mutational matrix")
+mutational_matrix = mut_matrix(all_vcfs,ref_genome)
+save(mutational_matrix,file="all_mut_matrix.rda")
+
+#Find optimal rank
+library(NMF)
+#Add pseudocount to mut matrix ?
+#mut_mat <- mut_mat + 0.0001
+estim.r <- nmf(mutational_matrix, rank=1:10,method="brunet", nrun=10, seed=123456)
+plot(estim.r)
+
+
+
+#Clear workspace 
+rm(all_vcfs,vcf_list,vcf_list_names)
+#Extract signatures
+
+number_of_signatures <- 4
+print("Extracting signatures")
+
+extracted_sign = extract_signatures(mutational_matrix, number_of_signatures) 
+
+save(extracted_sign, file="extracted_sign_33_tot.rda")
+print("Made it past extracting")
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+#Since reading the vcf file takes long time 
+rm(list=ls())
+setwd("C:/Users/Nils_/OneDrive/Skrivbord/Data/MC3")
+
+TSS2Study_DF <- read.table("TSS2Studyabb.txt",header=TRUE)
+
+
+
+
+#library(BiocParallel)
+library(BSgenome)
+library(GenomicRanges)
+library("BSgenome.Hsapiens.UCSC.hg19", character.only = TRUE)
+library(MutationalPatterns)
+library(plyr)
+library(data.table)
+#Set reference genome
+ref_genome = "BSgenome.Hsapiens.UCSC.hg19"
+
+
+# Read mc3-file (From PanCan)
+
+#MC3_DF <- read.table('mc3.v0.2.8.PUBLIC.maf.gz',header=TRUE,sep='\t',nrow=4000); #Has a total of 3600964 rows Around 24 min to read whole file
+
+
+
+
+start_time <- Sys.time()
+
+
+MC3_DF <- fread('mc3.v0.2.8.PUBLIC.maf.gz') #<- run for entire file
+
+end_time <- Sys.time()
+print("Read time")
+end_time - start_time
+
+
+#Select only necessary columns to save memory
+library(dplyr)
+MC3_DF <- select(MC3_DF, Chromosome,Tumor_Seq_Allele2,Tumor_Sample_Barcode,Start_Position,Reference_Allele)
+
+
+
+
+#Add Study.abbrevation to the MC3_DF matrix.
+MC3_DF$TSS.Code <-gsub("-[A-Z0-9]*-[A-Z0-9]*-[A-Z0-9]*-[A-Z0-9]*-[A-Z0-9]*$","",gsub("TCGA-","",MC3_DF$Tumor_Sample_Barcode))
+MC3_DF <- join(MC3_DF,TSS2Study_DF, by="TSS.Code")
+
+
+#Split into samples
+
+MC3_DF_samples <- split (MC3_DF, f=MC3_DF$Tumor_Sample_Barcode) # mayby i need drop = TRUE ?
+
+
+
+
+
+
+# Construct into VCF format
+#sample_id <- unique(Sample$Tumor_Sample_Barcode);
+
+maf2vcf <- function(maf_item){
+  
+  vcfdata <- matrix(".", nrow=nrow(maf_item), ncol = 10);
+  columns=c("#CHROM", "POS", "ID", "REF", "ALT", "QUAL", "FILTER", "INFO", "FORMAT","Sample_ID" )
+  colnames(vcfdata) <- columns
+  
+  vcfdata[,1]=as.character(maf_item$Chromosome)
+  vcfdata[,2]=as.character(maf_item$Start_Position)
+  vcfdata[,4]=as.character(maf_item$Reference_Allele)
+  vcfdata[,5]=as.character(maf_item$Tumor_Seq_Allele2)
+  vcfdata[,9]="GT"
+  #vcfdata[,10]="1/0"
+  vcfdata[,10] = as.character(maf_item$Tumor_Sample_Barcode)
+  
+  return(vcfdata)
+  
+}
+
+
+MC3_vcf <- lapply(MC3_DF_samples, maf2vcf)
+
+
+# Convert to GRange
+
+vcf2Grange <- function(VCF_item) {
+  
+  ref_genome <- base::get(genome)
+  ref_organism <- GenomeInfoDb::organism(ref_genome)
+  ref_style <- seqlevelsStyle(ref_genome)
+  
+  
+  
+  
+  #GRanges(seqnames = VCF_item$Chromosome,REF )
+  
+  
+  
+  
+  
+}
 
 
