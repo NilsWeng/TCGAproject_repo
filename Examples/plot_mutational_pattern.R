@@ -121,7 +121,7 @@ Cohort <- read.table("cohort.txt",header = TRUE)#maybe unness could just aswell 
 #loop over each cancer type
 cancer_list <- as.vector(unique(Cohort$subtype))
 
-cancer_list <- cancer_list[cancer_list %in% "ACC" ]
+cancer_list <- cancer_list[cancer_list %in% c("UCS","UVM") ]
 
 #Alter what cancer types you want to loop over
 #not_in = head(cancer_list,29)
@@ -143,7 +143,7 @@ for (cancer_type in cancer_list){
   print("reading file")
   cancer_vcfs <- read_vcfs_as_granges(VCF_files_to_read,VCF_files_ID,ref_genome) #Gets warning messages about alternative alleles
   
-  break()
+ 
   #Create mutational matrix 
   print("creating mutational matrix")
   mutational_matrix = mut_matrix(cancer_vcfs,ref_genome)
@@ -355,7 +355,7 @@ vcf_list_names <- gsub(".vcf","",gsub("[A-Z0-9]*/","",vcf_list))
 
 
 
-#############-------------------------------------------------------------------------------
+
 #Select subgroup with high mutation-number.
 setwd("C:/Users/Nils_/OneDrive/Skrivbord/Data/MC3/generated_data")
 mut_list <- list.files(path="C:/Users/Nils_/OneDrive/Skrivbord/Data/MC3/generated_data",recursive=TRUE,pattern="number_of_mutations.txt")
@@ -385,7 +385,7 @@ vcf_list <- vcf_list[vcf_list_names %in% number_mut_DF$Sample_id]
 vcf_list_names <- gsub(".vcf","",gsub("[A-Z0-9]*/","",vcf_list))
 setwd("C:/Users/Nils_/OneDrive/Skrivbord/Data/MC3/VCF_files")
 
-#################################--------------------------------------------------------------------
+#--------------------------------------------------------------------
 
 
 
