@@ -203,7 +203,7 @@ for (cancer in cancer_types){
  
     
     cancer_vcfs <- read_vcfs_as_granges(sample,sample_name,ref_genome)
-    
+    cancer_vcfs <- cancer_vcfs[[1]]
 
     
     #Plot rainfall
@@ -278,7 +278,7 @@ for(i in 2:length(chr_cum))
   m = c(m,(chr_cum[i-1] + chr_cum[i]) / 2)
 
 
-# mutation characteristics
+# mutation characteristicshg
 type = loc = dist = chrom = c()
 
 # for each chromosome
