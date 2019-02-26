@@ -218,7 +218,7 @@ DF1$P <- as.numeric(as.numeric(DF1$Expression)/as.numeric(DF1$AVG_expression))
 
 library(ggplot2)
 
-scatter_plot <- ggplot(DF1, aes(segment_mean, Expression))
+scatter_plot <- ggplot(DF1, aes(segment_mean, P))
 scatter_plot + geom_point() + labs(x = "log2(CN/2)", y = "Expression/AVG expression (within cancer)") + 
   ggtitle("Firebrowse-CHOL")
 
@@ -269,13 +269,13 @@ for (gene in genes){
   
 }
 
-corr_DF
+#corr_DF
 
 
 #Print CN vs EXP for some
 
 corr_DF <- corr_DF[!is.na(corr_DF$correlation),]
-dev.off()
+
 
 setwd("C:/Users/Nils_/OneDrive/Skrivbord/Data/Firebrowse/Pictures")
 pdf("Correlation_CHOL.pdf")
