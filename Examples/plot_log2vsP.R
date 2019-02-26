@@ -19,7 +19,6 @@ cancer_abb_vector <- as.data.frame(gsub("TCGA-","",gsub("-[A-Z0-9]*-[A-Z0-9]*$",
 colnames(cancer_abb_vector) <- "TSS.Code"
 cancer_abb_vector <- join(cancer_abb_vector,TSS2Study,by="TSS.Code")
 cancer_abb_vector <- as.vector(cancer_abb_vector[, 2])
-
 CNV_table$Study_abb <- cancer_abb_vector
 
 
@@ -28,7 +27,7 @@ CNV_table$Study_abb <- cancer_abb_vector
 
 
 #Make subset of CNV_table for certain cancertype
-selected_cancer <- "ACC"
+selected_cancer <- "CHOL"
 CNV_table <- CNV_table[CNV_table$Study_abb %in% selected_cancer ,]
 
 
@@ -50,9 +49,14 @@ df2Grange <- function(dfName){
 }
 
 
+#Convert CNV table to GRange-object
 CNV_Grange<-df2Grange(CNV_table)
 
+
+
+#Clear workspace on unused data to save space/workload
 rm(CNV_table,TSS2Study,cancer_abb_vector)
+
 #Make a postional list over all gene regions
 GeneRegions <- function (genelist) {
   
@@ -92,7 +96,6 @@ GenelistGrange <- GeneRegions()
 
 
 #Find all genes within regions of CNVs segements
-
 hits <- findOverlaps(GenelistGrange,CNV_Grange, type="within")  
 
 
@@ -218,7 +221,7 @@ DF <- na.omit(DF)
 #DF_B <- DF
 #Test reducing DF size
 
-DF <- DF[ (DF$segment_mean < -0) ,]
+#DF <- DF[ (DF$segment_mean < -0) ,]
 
 
 
@@ -256,11 +259,16 @@ cor.test(DF$segment_mean,DF$P)
 
 library(ggplot2)
 
-scatter_plot <- ggplot(DF, aes(segment_mean, P))
+
+
+#Rows get immited since they have NaN values, this is because som genes 0 expression for all samples (gives 0/0)
+
+
+scatter_plot <- ggplot(DF, aes(-segment_mean, P))
 scatter_plot + geom_point() + labs(x = "- log2(CN/2)", y = "Expression/AVG expression (within cancer)") + 
-  ggtitle("ACC 50k genes")
+  ggtitle("CHOL 50k genes")
   #+  geom_smooth(method="auto")
 
 
 scatter_plot <- ggplot(DF, aes(segment_mean, log(P)))
-scatter_plot + geom_point() + labs(x = "- log2(CN/2)", y = "log(Expression/AVG expression (within cancer))") 
+scatter_plot + geom_point() + labs(x = "log2(CN/2)", y = "log(Expression/AVG expression (within cancer))") 
