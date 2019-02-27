@@ -65,7 +65,7 @@ mRNA_exp <- mRNA_exp[!duplicated(mRNA_exp$`Hybridization REF`) ,]
 GISTIC <- GISTIC[, -(2:3)]
 
 
-correlation_DF <- data.frame()
+
 
 
 gene_vector <- as.character(GISTIC$`Gene Symbol`)
@@ -83,24 +83,75 @@ get_correlation <- function(gene_name){
 }
 
 
-#### Returns same value for all !!!
-test <- sapply(gene_vector[1:100],get_correlation)
+#Sample 1000 random samples from gene_vector
+
+#gene_vector <- sample(gene_vector,1000)
+
+
+#### Returns same value for all !!! 
+correlation_table <- list(1:length(gene_vector))
+correlation_table <- sapply(gene_vector,get_correlation) # Takes about 18s for 1000 -> 5min for 18k 
+
+#Switch column to rows
+correlation_table <- t(correlation_table)
+correlation_table <- as.data.frame(correlation_table)
+
+
+#Omit all NA:s
+correlation_table <- na.omit(correlation_table)
+
+#Order highest to lowest
+correlation_table <- correlation_table[order(correlation_table$correlation),]
+
+
+#Density plot of correlation
+setwd("C:/Users/Nils_/Downloads/Firebrowse/Pictures")
+pdf("Density plot ACC.pdf")
+d <- density(correlation_table$correlation) # returns the density data 
+plot(d,main="Density plot ACC")
+dev.off()
+
+
+# For top N greatest correlation plot
+N <- 100
+#top_N_corr <- order(abs(correlation_table$correlation), decreasing=TRUE)[1:N]
+#top_N_corr <- rownames(correlation_table)[top_N_corr]
+
+#For random sampling for plotting
+top_N_corr <- sample(rownames(correlation_table),N)
+
+
+library(ggplot2)
+
+
+setwd("C:/Users/Nils_/Downloads/Firebrowse/Pictures")
+pdf("Top N correlation ACC.pdf")
 
 
 
-for (gene in GISTIC$`Gene Symbol`){
+
+for (gene_name in top_N_corr){
   
-  print(gene)
-  CN <- as.numeric(GISTIC[GISTIC$`Gene Symbol` == gene ,][, -1])
-  EXP <- as.numeric(mRNA_exp[mRNA_exp$`Hybridization REF` == gene ,][, -1])
+  EXP <-   as.numeric(mRNA_exp[mRNA_exp$`Hybridization REF` == gene_name ,][, -1])
+  CN <- as.numeric(GISTIC[GISTIC$`Gene Symbol` == gene_name ,][, -1])
+ 
+  DF <- data.frame(EXP,CN)
+  corr <- cor(EXP,CN)
+  corr <- round(corr,3)
   
+  print(
+    
+  ggplot(DF, aes(EXP, CN)) +
+    geom_point() +
+    theme_minimal() +
+    ggtitle(paste(gene_name,corr,sep="  --  corr = "))
+    
+    
   
-  correlation_list <- cor.test(CN,EXP,method="pearson")
+  )
   
-  
-  correlation_DF <-
-  
-  
-  break()
+ 
 }
-  
+
+dev.off()
+
