@@ -235,133 +235,30 @@ tot_DBS %>% arrange(desc(freq))
 
 
 
+## Open the ALL_DBS_DF.txt file and do some calculations
+rm(list=ls())
+
+setwd("C:/Users/Nils_/OneDrive/Skrivbord/Data/MC3/DBS")
+
+library(dplyr)
+
+ALL_DBS <- read.table("ALL_DBS_DF.txt",stringsAsFactors = FALSE)
+
+ALL_DBS <- select(ALL_DBS,mut_type,freq)
+
+ALL_DBS_sum <- ALL_DBS %>% 
+  group_by(mut_type) %>% 
+  summarise(freq = sum(freq))
 
 
 
 
 
+sum(ALL_DBS_sum$freq)
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-Grange_vcf <- read_vcfs_as_granges(vcf_list,"CHOL",ref_genome)
-Grange_vcf <- Grange_vcf[[1]]
-
-
-
-
-
-
-
-DBS_mutation <- function(Grange_vcf,ref_genome){
-  
-  Grange_vcf <- sortSeqlevels(Grange_vcf)
-  
-  
-  diff_vector <- as.numeric(diff(Grange_vcf@ranges@start))
-  DBS_pos <- which(diff_vector == 1)
-  DBS_pos <- c(DBS_pos,DBS_pos+1)
-  DBS_pos <- sort.default(DBS_pos)
-  #Find all 
-  DBS_mut_g <- Grange_vcf[DBS_pos ,]
-  
-  #find 3' and 5' surrounding
-  
-  ranges = resize(DBS_mut_g, 3, fix = "center")
-  
-  
-  
-  
-  
-  #mut_surrounding <- function()
-  
-  
-  mut_surrounding <- function(vcf_g,ref_genome){
-    
-    #Only correct for first base
-    
-    
-    ranges = resize(vcf_g, 3, fix = "center")
-    vcf_context = as.character(getSeq(get(ref_genome),
-                                      seqnames(vcf_g),
-                                      start(vcf_g) - 1,
-                                      end(vcf_g) + 2))
-    
-    return(vcf_context)
-    
-  }
-  
-  
-  
-  
-  mut_surround <- mut_surrounding(DBS_mut_g,ref_genome)
-  mut_surround <- mut_surround[seq(1,length(mut_surround),2)]
-  mut_surround <- rep(as.vector(mut_surround),each=2)
-  
-  from <- mut_surround
-  to   <- data.frame(DBS_mut_g$ALT)
-  to <- as.vector(to$value)
-  to <- paste(to[seq(1,length(to),2)],to[seq(2,length(to),2)],sep="")
-  to <- rep(as.vector(to),each=2)
-  to <- paste(gsub("[A-Z][A-Z][A-Z]$","",from),to,sep="")
-  to <- paste(to,gsub("^[A-Z][A-Z][A-Z]","",from),sep="")
-  return_matrix <- data.frame(from,to,DBS_mut_g@ranges@start,DBS_mut_g@seqnames,DBS_mut_g@ranges@NAMES)
-  return(unique(return_matrix))
-  
-  
-  
-  
-}
-
-
-DBS_DF <- DBS_mutation(Grange_vcf,ref_genome)
-
-
-#Make a list of what types of DBS mutations are most common
-
-from_mut <- substr(as.character(DBS_DF$from),2,3)
-to_mut <-  substr(as.character(DBS_DF$to),2,3)
-mut_type <- paste(from_mut,to_mut,sep=">")
-mut_type <- mut_type[seq(1,length(mut_type),2)]
-
-
-
-
-
-DBS_freq_table <- rbind(DBS_freq_table,count(mut_type))
-
-
-
-
-
-
-
-
-#Create a mutational matrix for DBS
-Context<-c("A.A","A.C","A.G","A.T","C.A","C.C","C.G","C.T","G.A","G.C","G.G","G.T","T.A","T.C","T.G","T.T")
-
-Type <- c("AA","AC","AG","AT","CA","AC","AG","AT","AA","AC","AG","AT")
-
-
-
+test  <- ALL_DBS %>% group_by(mut_type,context) %>%  summarise(freq = sum(freq))
 
 
 
