@@ -332,7 +332,11 @@ for (cancer_type in cancer_list){
 
 
 
-# Total/Extract signatures from all samples at the same time --------------
+
+
+
+
+# Total/Extract signatures from highly mutated samples at the same time --------------
 rm(list=ls())
 
 #Import needed packages
@@ -340,6 +344,7 @@ library(MutationalPatterns)
 library(BSgenome)
 library("BSgenome.Hsapiens.UCSC.hg19", character.only = TRUE)
 library(plyr)
+library(dplyr)
 #Set reference genome
 ref_genome = "BSgenome.Hsapiens.UCSC.hg19"
 
@@ -347,48 +352,52 @@ setwd("C:/Users/Nils_/OneDrive/Skrivbord/Data/MC3/VCF_files")
 
 vcf_list <- list.files(path="C:/Users/Nils_/OneDrive/Skrivbord/Data/MC3/VCF_files",recursive=TRUE,pattern=".vcf")
 
-#Unselect cohort.vcf files
+#Remove cohort.vcf files
 vcf_list <- vcf_list[grep("cohort",vcf_list,invert = TRUE)]
-#vcf_list <- vcf_list[grep("cohort",vcf_list)]
+
 
 vcf_list_names <- gsub(".vcf","",gsub("[A-Z0-9]*/","",vcf_list))
 
 
+#Get list with highly mutated samples
+setwd("C:/Users/Nils_/OneDrive/Skrivbord/Data/MC3")
+cohort <- read.table("cohort.txt",stringsAsFactors = FALSE)
 
-
-#Select subgroup with high mutation-number.
-setwd("C:/Users/Nils_/OneDrive/Skrivbord/Data/MC3/generated_data")
-mut_list <- list.files(path="C:/Users/Nils_/OneDrive/Skrivbord/Data/MC3/generated_data",recursive=TRUE,pattern="number_of_mutations.txt")
-
-#Open each mutation list file and select samplenames with certain number of mutations.
-
-number_mut_DF <- data.frame()
-
-for (mut_file in mut_list) {
+treshold_nmut <- function(cancer_name){
   
+  samples <- cohort %>% filter(subtype == cancer_name)
   
-  file_df <- read.table(mut_file,header=TRUE)
-  file_df$study_abb <- gsub("/..*","",mut_file)
+  median <- median(samples$nmut)
+  S <- sd(samples$nmut)
+  treshold <- median + 3*S
   
-  number_mut_DF <-rbind(number_mut_DF,file_df)
+  high_mut_sample <- samples %>% filter(nmut > treshold) %>% select(sample)
+  
+  return(high_mut_sample)
   
   
 }
 
+#Extract vector of names containing highly mutated samples
+High_mut_samples <- sapply(unique(cohort$subtype), treshold_nmut)
+High_mut_samples <- unlist(High_mut_samples)
+High_mut_samples <- unname(High_mut_samples)
 
-number_mut_DF <- number_mut_DF[number_mut_DF$X.mutations >= 2000 ,]
+
+
+
 
 
 #Trim vcf_list for only high mutation samples
 
-vcf_list <- vcf_list[vcf_list_names %in% number_mut_DF$Sample_id]
+vcf_list <- vcf_list[vcf_list_names %in% High_mut_samples]
 vcf_list_names <- gsub(".vcf","",gsub("[A-Z0-9]*/","",vcf_list))
-setwd("C:/Users/Nils_/OneDrive/Skrivbord/Data/MC3/VCF_files")
+
 
 #--------------------------------------------------------------------
 
 
-
+setwd("C:/Users/Nils_/OneDrive/Skrivbord/Data/MC3/VCF_files")
 #Read vcf-files and save as R object.
 start_time <- Sys.time()
 
@@ -401,20 +410,24 @@ print("Done reading all vcfs!!!!!!!")
 
 end_time <- Sys.time()
 print("Read time")
-end_time - start_time
+end_time - start_time # Took about 10 min for 65 samples
 
 
 #Save the all_vcfs object
-setwd("C:/Users/Nils_/OneDrive/Skrivbord/Data/MC3/Global_mutsign")
-save(all_vcfs,file="all_vcfs.rda")
+setwd("C:/Users/Nils_/OneDrive/Skrivbord/Data/MC3/Global_mutsign/High_mutations(3s)")
+save(all_vcfs,file="high_mut_vcfs.rda")
 
 
 #Extract mutational matrix
 print("creating mutational matrix")
 mutational_matrix = mut_matrix(all_vcfs,ref_genome)
-save(mutational_matrix,file="all_mut_matrix.rda")
+save(mutational_matrix,file="high_mut_matrix.rda")
 
-colnames(mutational_matrix) <- number_mut_DF$study_abb ####################For having cancer abb as names
+#Add cancer abb as name
+colnames(mutational_matrix) <- gsub("/.*$","",vcf_list) ####################For having cancer abb as names
+#[cohort$sample %in% vcf_list_names]
+
+#just to give unique name to each (so one can plot)
 for (i in 1:length(colnames(mutational_matrix))) {
   
   colnames(mutational_matrix)[i]<- paste(colnames(mutational_matrix)[i],i,sep="-")
@@ -426,7 +439,7 @@ for (i in 1:length(colnames(mutational_matrix))) {
 library(NMF)
 #Add pseudocount to mut matrix ?
 #mut_mat <- mut_mat + 0.0001
-estim.r <- nmf(mutational_matrix, rank=1:10,method="brunet", nrun=10, seed=123456)
+estim.r <- nmf(mutational_matrix, rank=1:8,method="brunet", nrun=12, seed=123456)
 plot(estim.r)
 
 
@@ -434,7 +447,7 @@ plot(estim.r)
 #Clear workspace 
 #rm(all_vcfs,vcf_list,vcf_list_names)
 #Extract signatures
-number_of_signatures <- 4
+number_of_signatures <- 2
 print("Extracting signatures")
 
 extracted_sign = extract_signatures(mutational_matrix, number_of_signatures) 
@@ -446,17 +459,20 @@ save(extracted_sign, file="extracted_sign_high_mut.rda")
 print("Made it past extracting")
 
 
-colnames(extracted_sign$contribution) <- colnames(mutational_matrix) ####################For having cancer abb as name
+#colnames(extracted_sign$contribution) <- colnames(mutational_matrix) ####################For having cancer abb as name
 
 
 #Needed for comparing to cosmic
 setwd("C:/Users/Nils_/OneDrive/Skrivbord/Data/MC3")
-cosmic_signatures <- as.matrix(read.table("cosmic_signatures.txt",header=TRUE))
+#cosmic_signatures <- as.matrix(read.table("cosmic_signatures.txt",header=TRUE))
+cosmic_signatures <- as.matrix(read.table("cosmic_signatures_extended.txt",header=TRUE))
+
+
 #Print results
 
 #Set options here
 setwd("C:/Users/Nils_/OneDrive/Skrivbord/Data/MC3/Global_mutsign/High_mutations")
-pdf_name <- paste("High_mutation_samples.pdf")
+pdf_name <- paste("HighMut_new_cosmic.pdf")
 
 
 print_mutsign <- function() {
@@ -553,6 +569,18 @@ print_mutsign <- function() {
   
   
   
+  #plot reconstructed mutational profiles from extracted
+  print(plot_compare_profiles(mutational_matrix[,1],
+                          extracted_sign$reconstructed[,1],profile_names = c("Original", "Reconstructed"),condensed = TRUE))
+  
+  
+  
+  #plot reconstructed mutational profiles from cosmic
+  print(plot_compare_profiles(mutational_matrix[,1], fit_res$reconstructed[,1],
+                        profile_names = c("Original", "Reconstructed(cosmic)"),condensed = TRUE))
+  
+  
+  
   dev.off()
 }
 
@@ -561,127 +589,35 @@ print_mutsign()
 
 
 
+# Cluster cosine-sim matrix
+cos_sim_samples_cosmic <- cos_sim_matrix(mutational_matrix, cosmic_signatures)
+sample_cluster <- hclust(dist(cos_sim_samples_cosmic,method="euclidean"),method="complete")
+plot(sample_cluster)
+N<-5
+method <- "complete"
+cluster_groups <- cutree(sample_cluster,k=N)
+
+#Plot with found clusters
+plot(sample_cluster, cex = 0.6)
+rect.hclust(sample_cluster, k = 5, border = 2:5)
 
 
+#Determine optimal number of clusters (3 different methods)
+library(factoextra)
+#elbow method
+fviz_nbclust(cos_sim_samples_cosmic, FUN = hcut, method = "wss")
+#silhouette method
+fviz_nbclust(cos_sim_samples_cosmic, FUN = hcut, method = "silhouette")
+#Gap statistic method
+set.seed(123)
+gap_stat <- clusGap(cos_sim_samples_cosmic, FUN = kmeans, nstart = 25,K.max = 15, B = 50)
+print(gap_stat, method = "firstmax")
+fviz_gap_stat(gap_stat)
 
+#tidyverse seems like a nice package !!!!
 
+#Extract what samples are in each cluster
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-#Since reading the vcf file takes long time 
-rm(list=ls())
-setwd("C:/Users/Nils_/OneDrive/Skrivbord/Data/MC3")
-
-TSS2Study_DF <- read.table("TSS2Studyabb.txt",header=TRUE)
-
-
-
-
-#library(BiocParallel)
-library(BSgenome)
-library(GenomicRanges)
-library("BSgenome.Hsapiens.UCSC.hg19", character.only = TRUE)
-library(MutationalPatterns)
-library(plyr)
-library(data.table)
-#Set reference genome
-ref_genome = "BSgenome.Hsapiens.UCSC.hg19"
-
-
-# Read mc3-file (From PanCan)
-
-#MC3_DF <- read.table('mc3.v0.2.8.PUBLIC.maf.gz',header=TRUE,sep='\t',nrow=4000); #Has a total of 3600964 rows Around 24 min to read whole file
-
-
-
-
-start_time <- Sys.time()
-
-
-MC3_DF <- fread('mc3.v0.2.8.PUBLIC.maf.gz') #<- run for entire file
-
-end_time <- Sys.time()
-print("Read time")
-end_time - start_time
-
-
-#Select only necessary columns to save memory
-library(dplyr)
-MC3_DF <- select(MC3_DF, Chromosome,Tumor_Seq_Allele2,Tumor_Sample_Barcode,Start_Position,Reference_Allele)
-
-
-
-
-#Add Study.abbrevation to the MC3_DF matrix.
-MC3_DF$TSS.Code <-gsub("-[A-Z0-9]*-[A-Z0-9]*-[A-Z0-9]*-[A-Z0-9]*-[A-Z0-9]*$","",gsub("TCGA-","",MC3_DF$Tumor_Sample_Barcode))
-MC3_DF <- join(MC3_DF,TSS2Study_DF, by="TSS.Code")
-
-
-#Split into samples
-
-MC3_DF_samples <- split (MC3_DF, f=MC3_DF$Tumor_Sample_Barcode) # mayby i need drop = TRUE ?
-
-
-
-
-
-
-# Construct into VCF format
-#sample_id <- unique(Sample$Tumor_Sample_Barcode);
-
-maf2vcf <- function(maf_item){
-  
-  vcfdata <- matrix(".", nrow=nrow(maf_item), ncol = 10);
-  columns=c("#CHROM", "POS", "ID", "REF", "ALT", "QUAL", "FILTER", "INFO", "FORMAT","Sample_ID" )
-  colnames(vcfdata) <- columns
-  
-  vcfdata[,1]=as.character(maf_item$Chromosome)
-  vcfdata[,2]=as.character(maf_item$Start_Position)
-  vcfdata[,4]=as.character(maf_item$Reference_Allele)
-  vcfdata[,5]=as.character(maf_item$Tumor_Seq_Allele2)
-  vcfdata[,9]="GT"
-  #vcfdata[,10]="1/0"
-  vcfdata[,10] = as.character(maf_item$Tumor_Sample_Barcode)
-  
-  return(vcfdata)
-  
-}
-
-
-MC3_vcf <- lapply(MC3_DF_samples, maf2vcf)
-
-
-# Convert to GRange
-
-vcf2Grange <- function(VCF_item) {
-  
-  ref_genome <- base::get(genome)
-  ref_organism <- GenomeInfoDb::organism(ref_genome)
-  ref_style <- seqlevelsStyle(ref_genome)
-  
-  
-  
-  
-  #GRanges(seqnames = VCF_item$Chromosome,REF )
-  
-  
-  
-  
-  
-}
-
-
+cluster_groups <- data.frame("Sample_id"=vcf_list_names,"Cluster"=as.vector(cluster_groups))
+filename <- paste("Sample_In_Cluster",method,N,sep="_")
+write.table(cluster_groups,paste(filename,".txt",sep=""),row.names = FALSE)

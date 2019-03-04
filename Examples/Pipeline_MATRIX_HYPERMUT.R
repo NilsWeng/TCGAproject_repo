@@ -36,6 +36,7 @@ High_mut_samples <- unname(High_mut_samples)
 High_mut_samples <- gsub("-[A-Z0-9]*-[A-Z0-9]*-[A-Z0-9]*$","",High_mut_samples)
 
 
+
 # Get list of DNA-repair genes --------------------------------------------
 setwd("C:/Users/Nils_/OneDrive/Skrivbord/Data")
 DNA_repair <- read.csv("DNA_repair.csv",sep=";")
@@ -175,6 +176,8 @@ for (sample in common_samples){
 }
 
 
+ hypermut_matrix <- hypermut_matrix[1:20 , 1:20]
+
 # Create 2 matrix: CNVs and SNVs ------------------------------------------
 #For running Malins script
 
@@ -203,18 +206,112 @@ cnvs <- t(cnvs)
 snvs <- t(snvs)
 
 
+
+# Catagorize snvs ---------------------------------------------------------
+
+# If there are to many types bundle together unessesary into other
+
+
+
+
+
 # Visualise/plot matrix ---------------------------------------------------
+
+
+image.scale <- function(z, zlim, col = heat.colors(12),
+                        breaks, axis.pos=1, add.axis=TRUE, ...){
+  if(!missing(breaks)){
+    if(length(breaks) != (length(col)+1)){stop("must have one more break than colour")}
+  }
+  if(missing(breaks) & !missing(zlim)){
+    breaks <- seq(zlim[1], zlim[2], length.out=(length(col)+1)) 
+  }
+  if(missing(breaks) & missing(zlim)){
+    zlim <- range(z, na.rm=TRUE)
+    zlim[2] <- zlim[2]+c(zlim[2]-zlim[1])*(1E-3)#adds a bit to the range in both directions
+    zlim[1] <- zlim[1]-c(zlim[2]-zlim[1])*(1E-3)
+    breaks <- seq(zlim[1], zlim[2], length.out=(length(col)+1))
+  }
+  poly <- vector(mode="list", length(col))
+  for(i in seq(poly)){
+    poly[[i]] <- c(breaks[i], breaks[i+1], breaks[i+1], breaks[i])
+  }
+  if(axis.pos %in% c(1,3)){ylim<-c(0,1); xlim<-range(breaks)}
+  if(axis.pos %in% c(2,4)){ylim<-range(breaks); xlim<-c(0,1)}
+  plot(1,1,t="n",ylim=ylim, xlim=xlim, axes=FALSE, xlab="", ylab="", xaxs="i", yaxs="i", ...)  
+  for(i in seq(poly)){
+    if(axis.pos %in% c(1,3)){
+      polygon(poly[[i]], c(0,0,1,1), col=col[i], border=NA)
+    }
+    if(axis.pos %in% c(2,4)){
+      polygon(c(0,0,1,1), poly[[i]], col=col[i], border=NA)
+    }
+  }
+  box()
+  if(add.axis) {axis(axis.pos)}
+}
+
+
+
+
+
+library(randomcoloR)
+
+#Set colour and labels 
+
+#SNV
+snv_labels <- unique(levels(factor(snvs)))
+snvsymbols <- c(1:length(snv_labels))
+snvcol <- distinctColorPalette(length(snv_labels))
+
+#CNV
+cnv_labels <- unique(levels(factor(cnvs)))
+#cnvcol <- distinctColorPalette(length(cnv__labels))
+cnvcol=c("#D55E00", "#E69F00","#ffffff","#56B4E9","#0072B2")
+
+#Other
+labelcolors <- c("#D55E00", "#0072B2")
+maincol=c("#737373","#bdbdbd")
+
+#Cancertype
+
+
+get_cancertype <- function(name){
+  
+  cancertype <- cohort[grep(name,cohort$sample), 2]
+  
+  return(cancertype)
+}
+
+
+cancertype <- rownames(cnvs)
+cancertype <- as.vector(sapply(cancertype,get_cancertype))
+cancertype_labels <- levels(factor(cancertype))
+cancertype_pos <- vector()
+cancertype_col <- distinctColorPalette(length(cancertype_labels))
+
+#position
+
+
+
+
+#Labels
+samplenames <- rownames(cnvs)
+samplenames <- gsub("TCGA-","",samplenames)
+samplenames <- gsub("-[A-Z0-9]*$","",samplenames)
+samplecol <- character()
+genenames <- colnames(cnvs)
+
+
+
+
 
 
 setwd("C:/Users/Nils_/OneDrive/Skrivbord/Data/Pictures")
 imagefile <- "TEST.pdf"
-subtypes <- 
 
 
 
-
-cnvcol=c("#D55E00", "#E69F00","#ffffff","#56B4E9","#0072B2", "#08306b")
-maincol=c("#737373","#bdbdbd")
 
 
 #pdf(imagefile, width=7, height=7)
@@ -241,22 +338,54 @@ abline(v=x + 0.5, col=maincol[2])
 box(col=maincol[1])
 
  
+
 #Add SNVs
-
-#All variants
-#levels(factor(MC3_DF$Variant_Classification))
-
-for (l in as.integer(levels(factor(snvs)))){
-  if(l>0){
-    snvs_marks=which(snvs == l, arr.ind=T)
-    points(snvs_marks, pch = snvsymbols[l], bg=snvcol[l], col=snvcol[l], cex=0.7, lwd=0.7)
+for (i in 1:length(snv_labels)){
+  
+  if (snv_labels[i] == "NA"){
+    
+    next()
+    
   }
+  
+  snvs_marks = which(snvs == snv_labels[i],arr.ind=T)
+  points(snvs_marks, pch = snvsymbols[i], bg=snvcol[i], col=snvcol[i], cex=0.7, lwd=0.7)
+  
 }
 
 
 
+
+
+
+#Gene names
+par(mar = c(0,4,4,1))
+mtext(genenames, at=(1:ncol(cnvs)), side=2, adj=1, las=1, cex=0.6, font=2, col=maincol[1])
+
+#Sample names
+par(mar = c(0,4.2,3.3,1))
+mtext(samplenames, at=1:nrow(cnvs), side=3, cex=0.5, las=3, adj=0, font=2)
  
-dev.off()
-  
-  
+#
+par(mar = c(0,4.2,3.8,1))
+mtext(cancertype, at=1:nrow(cnvs), side=3, cex=0.6, las=1, padj=1, adj=0.5, col=labelcolors[1], font=2)
+
+
+#
+
+
+
+par(mar=c(2,4.2,1,10))
+image.scale(cnvs, col=cnvcol,  breaks =c(1:(length(cnv_labels)+1)), add.axis=FALSE)
+abline(v=c(0,1,2,3,4,5))
+mtext(c(0:(length(cnv_labels)-1)), at=((2:(length(cnv_labels)+1))-0.5), padj = 0.5, adj=0.5, side=1, cex=0.7, col=maincol[1])
+#mtext(c(4,0,1,2,3), at=((1:(length(cnv_labels)+1))-0.5), padj = 0.5, adj=0.5, side=1, cex=0.7, col=maincol[1]) # so stupid
+box(col=maincol[1])
+
+
+#SNV explanation
+####FRÅGA MALIN 
+
+
+
  
