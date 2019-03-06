@@ -30,7 +30,7 @@ read_mRNASeq <- function(files){
   
 }
 
-file_list <- file_list[1:3]
+#file_list <- file_list[1:3]
 
 dataset <- do.call("cbind",lapply(file_list ,read_mRNASeq))
 dataset <- dataset[, !duplicated(colnames(dataset))]

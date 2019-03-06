@@ -14,7 +14,7 @@ library(ggplot2)
 
 #High-mutation samples that have been clustered
 setwd("C:/Users/Nils_/OneDrive/Skrivbord/Data/MC3/Global_mutsign/High_mutations(3s)")
-clustered_samples <- read.table("Sample_In_Cluster_complete_5.txt",header=TRUE,stringsAsFactors = FALSE)
+clustered_samples <- read.table("Sample_In_Cluster_complete_7.txt",header=TRUE,stringsAsFactors = FALSE)
 clustered_samples$Sample_id <- gsub("-[A-Z0-9]*-[A-Z0-9]*-[A-Z0-9]*$","",clustered_samples$Sample_id)
 
 
@@ -55,6 +55,7 @@ std_row <- rowMads(mRNA_exp)
 
 
 get_Tstat_for_gene <- function(gene_name){
+  #Function that returns p-value of statistic test for each cluster given a gene name.
   
   gene_vector <- vector(mode="numeric", length=length(mRNA_cluster))
   pop_row <- mRNA_exp[rownames(mRNA_exp) == gene_name ,]
@@ -84,47 +85,11 @@ get_Tstat_for_gene <- function(gene_name){
   
 }
 
-
-# More advanced statistic (looking within each cancer) --------------------
-
-gene_name <- "ITPA"
-
-
-get_stat_advanced <- function(gene_name){
-  
-  gene_vector <- vector(mode="numeric", length=length(mRNA_cluster))
-  pop_row <- mRNA_exp[rownames(mRNA_exp) == gene_name ,]
-  
-  for (i in 1:length(mRNA_cluster)){
-    
-    sub_pop <- mRNA_cluster[[i]]
-    sub_pop <- select(sub_pop, -one_of("Cluster"))
-    sub_pop <- t(sub_pop)
-    
-    sub_pop_row <- sub_pop[rownames(sub_pop) == gene_name ,]
-    
-    #statistic <- t.test(sub_pop_row,pop_row)$p.value
-    statistic <- wilcox.test(sub_pop_row,pop_row)$p.value
-    
-    gene_vector[i] <- statistic
-    #qqnorm(sub_pop_row,main="QQ plot of sub_pop",pch=19)
-    #qqline(sub_pop_row)
-    
-    
-  }
-  
-  #Only works when naming 5 clusters
-  names(gene_vector) <- paste("cluster",c(1:length(mRNA_cluster)),sep="")
-  return(gene_vector)
-  
-  
-}
-
-
-
-
+#Returns p-value of wilcox.test for each cluster and gene
 Statistic_DF <- as.data.frame(sapply(rownames(mRNA_exp),get_Tstat_for_gene))
 
+
+# More advanced statistic (looking within each cancer) --------------------
 
 # Select genes with significant p-value from Statistic_DF -----------------
 

@@ -589,17 +589,28 @@ print_mutsign()
 
 
 
+
 # Cluster cosine-sim matrix
+
+##################################################
+setwd("C:/Users/Nils_/OneDrive/Skrivbord/Data/MC3/Global_mutsign/High_mutations(3s)")
+library(MutationalPatterns)
+load("high_mut_matrix.rda")
+colnames(mutational_matrix) <- gsub("-[A-Z0-9]*-[A-Z0-9]*-[A-Z0-9]*$","",colnames(mutational_matrix))
+setwd("C:/Users/Nils_/OneDrive/Skrivbord/Data/MC3")
+cosmic_signatures <- as.matrix(read.table("cosmic_signatures_extended.txt",header=TRUE))
+###############################################
+
 cos_sim_samples_cosmic <- cos_sim_matrix(mutational_matrix, cosmic_signatures)
 sample_cluster <- hclust(dist(cos_sim_samples_cosmic,method="euclidean"),method="complete")
 plot(sample_cluster)
-N<-5
+N<-7
 method <- "complete"
 cluster_groups <- cutree(sample_cluster,k=N)
 
 #Plot with found clusters
 plot(sample_cluster, cex = 0.6)
-rect.hclust(sample_cluster, k = 5, border = 2:5)
+rect.hclust(sample_cluster, k = N, border = 2:5)
 
 
 #Determine optimal number of clusters (3 different methods)
@@ -617,7 +628,7 @@ fviz_gap_stat(gap_stat)
 #tidyverse seems like a nice package !!!!
 
 #Extract what samples are in each cluster
-
+setwd("C:/Users/Nils_/OneDrive/Skrivbord/Data/MC3/Global_mutsign/High_mutations(3s)")
 cluster_groups <- data.frame("Sample_id"=vcf_list_names,"Cluster"=as.vector(cluster_groups))
 filename <- paste("Sample_In_Cluster",method,N,sep="_")
 write.table(cluster_groups,paste(filename,".txt",sep=""),row.names = FALSE)

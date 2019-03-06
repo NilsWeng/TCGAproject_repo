@@ -176,7 +176,22 @@ for (sample in common_samples){
 }
 
 
- hypermut_matrix <- hypermut_matrix[1:20 , 1:20]
+ #hypermut_matrix <- hypermut_matrix[91:189 ,]
+ 
+ #Modify sample_id
+ 
+ get_cancertype <- function(name){
+   
+   cancertype <- cohort[grep(name,cohort$sample), 2]
+   
+   return(cancertype)
+ }
+ 
+ cancertype <- colnames(hypermut_matrix)
+ cancertype <- as.vector(sapply(cancertype,get_cancertype))
+ 
+ colnames(hypermut_matrix) <- gsub("TCGA-","",gsub("-[A-Z0-9]*$","",colnames(hypermut_matrix)))
+ colnames(hypermut_matrix) <- paste(colnames(hypermut_matrix),cancertype,sep="-")
 
 # Create 2 matrix: CNVs and SNVs ------------------------------------------
 #For running Malins script
@@ -196,7 +211,7 @@ snvs <- as.matrix(snvs)
 
 #Deal with several mutations in gene
 test <- strsplit(snvs,",")
-test <- 
+
 
 
 
@@ -379,12 +394,122 @@ par(mar=c(2,4.2,1,10))
 image.scale(cnvs, col=cnvcol,  breaks =c(1:(length(cnv_labels)+1)), add.axis=FALSE)
 abline(v=c(0,1,2,3,4,5))
 mtext(c(0:(length(cnv_labels)-1)), at=((2:(length(cnv_labels)+1))-0.5), padj = 0.5, adj=0.5, side=1, cex=0.7, col=maincol[1])
-#mtext(c(4,0,1,2,3), at=((1:(length(cnv_labels)+1))-0.5), padj = 0.5, adj=0.5, side=1, cex=0.7, col=maincol[1]) # so stupid
+#mtext(c(4,0,1,2,3), at=((1:(length(cnv_labels)+1))-0.5), padj = 0.5, adj=0.5, side=1, cex=0.7, col=maincol[1]) 
 box(col=maincol[1])
 
 
 #SNV explanation
 ####FRÅGA MALIN 
+#SNV legend next to the CNV levels image
+#legend("right", inset=c(-1.6,0), xpd = TRUE, snv_labels, pch=snvsymbols, pt.bg=snvcol,
+       #pt.lwd=0.7, horiz=TRUE, cex=0.7 , bty="n", col=snvcol, text.col=maincol[1])
+
+
+
+
+
+
+# GGplot section ----------------------------------------------------------
+
+
+
+#Prova GG plot istället:
+library(ggplot2)
+library(reshape2)
+
+longData <- melt(cnvs)
+longData1 <- melt(snvs)
+longData$cnvs <- as.factor(longData$value)
+longData$snvs <- as.factor(longData1$value)
+#longData[longData$snvs == "NA", 4] <- NA
+longData$cnvs <- as.factor(longData$value)
+longData <- longData %>% select(Var1,Var2,cnvs,snvs)
+colnames(longData) <- c("sample","gene","cnvs","snvs")
+
+#Modify sample id
+#longData$sample <- gsub("TCGA-","",gsub("-[A-Z0-9]*$","",longData$sample))
+#cancertype <- longData$sample
+#cancertype <- as.vector(sapply(cancertype,get_cancertype))
+
+
+#If you want to cluster data before plotting
+hc.sample = hclust(dist(cnvs), method = "complete")
+sample_order = rownames(cnvs)[hc.sample$order]
+
+#longData <- left_join(data.frame(sample=sample_order),longData,by="sample")
+
+
+longData$sample = factor(longData$sample, levels = sample_order)
+
+dev.off()
+
+
+snv_shapes <- c(65:(65+length(snv_labels)))  
+textcol <- "grey40"
+
+#modified ggplot
+ggplot(longData,aes(x=gene,y=sample,fill=cnvs))+
+  geom_tile()+
+  #redrawing tiles to remove cross lines from legend
+  geom_tile(colour="white",size=0.25)+
+  #remove axis labels, add title
+  labs(x="",y="",title="TEST GGplot (All samples) - clustered")+
+  #remove extra space
+  scale_y_discrete(expand=c(0,0))+
+  #custom breaks on x-axis
+  scale_x_discrete(expand=c(0,0))+
+                   #breaks=c("1930","1940","1950","1960","1970","1980","1990","2000"))+
+  #custom colours for cut levels and na values
+  scale_fill_manual(values=c("#D55E00", "#E69F00","grey70","#56B4E9","#0072B2"))+
+  #mark year of vaccination
+  #geom_vline(aes(xintercept = 36),size=3.4,alpha=0.24)+
+  #equal aspect ratio x and y axis
+  coord_fixed()+
+  #Add snv data (remove NA(ie no mutation))
+  geom_point(data=subset(longData,!snvs=="NA"), aes(shape=snvs))+
+  scale_shape_manual(values=snv_shapes)+
+  #set base size for all font elements
+  theme_grey(base_size=10)+
+  #theme options
+  theme(
+    #remove legend title
+    legend.title=element_blank(),
+    #remove legend margin
+    legend.spacing  = grid::unit(0,"cm"),
+    #change legend text properties
+    legend.text=element_text(colour=textcol,size=7,face="bold"),
+    #change legend key height
+    #legend.key.height=grid::unit(0.8,"cm"),
+    #set a slim legend
+    legend.key.width=grid::unit(0.4,"cm"),
+    #set x axis text size and colour
+    axis.text.x=element_text(colour=textcol,angle=90, hjust=1),
+    #set y axis text colour and adjust vertical justification
+    axis.text.y=element_text(vjust = 0.2,colour=textcol),
+    #change axis ticks thickness
+    axis.ticks=element_line(size=0.4),
+    #change title font, size, colour and justification
+    plot.title=element_text(colour=textcol,hjust=0,size=14,face="bold"),
+    #remove plot background
+    plot.background=element_blank(),
+    #remove plot border
+    panel.background= element_rect(colour = "black", fill=NA, size=1))
+
+
+snv_shapes <- c(65:(65+length(snv_labels)))  
+
+#Egen
+ggplot(longData,aes(x = gene, y = sample,fill=as.factor(cnvs)))+
+  geom_raster()+
+  scale_fill_manual(values=c("#D55E00", "#E69F00","#ffffff","#56B4E9","#0072B2"))+
+  geom_point(na.rm = TRUE, aes(shape=snvs))+
+  scale_shape_manual(values=snv_shapes)+
+  #theme_bw()+
+  theme(axis.text.x=element_text(angle=90, hjust=1),
+        axis.ticks = element_blank(),
+        panel.background  = element_rect(colour = "black", fill=NA, size=1),
+        panel.grid.major = element_line(colour="black", size=0.5),
+        panel.grid.minor = element_line(colour="black", size=0.5))
 
 
 
