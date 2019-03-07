@@ -132,6 +132,7 @@ colnames(hypermut_matrix) <- common_samples[order(common_samples)]
 rownames(hypermut_matrix) <- common_genes[order(common_genes)]
 hypermut_matrix <- as.data.frame(hypermut_matrix)
 
+
   
 for (sample in common_samples){
   
@@ -175,41 +176,23 @@ for (sample in common_samples){
   
 }
 
+#Optional order data after cosine-mutsign clustering
+setwd("C:/Users/Nils_/OneDrive/Skrivbord/Data/MC3/Global_mutsign/High_mutations(3s)")
+clustered_samples <- read.table("Sample_In_Cluster_complete_7.txt",header=TRUE,stringsAsFactors = FALSE)
+clustered_samples <- clustered_samples %>% arrange(Cluster) 
+clustered_samples$Sample_id <- gsub("-[A-Z0-9]*-[A-Z0-9]*-[A-Z0-9]*$","",clustered_samples$Sample_id)
+clustered_samples <- clustered_samples %>% filter(Sample_id %in% colnames(hypermut_matrix))
+sample_order <- clustered_samples$Sample_id
 
 
 
- #hypermut_matrix <- hypermut_matrix[1:60 ,]
+hypermut_matrix <- hypermut_matrix[sample_order]
+
+
+
+#hypermut_matrix <- hypermut_matrix[1:60 ,]
  
-if(FALSE){
-  #Optional order data after cosine-mutsign clustering
-  setwd("C:/Users/Nils_/OneDrive/Skrivbord/Data/MC3/Global_mutsign/High_mutations(3s)")
-  clustered_samples <- read.table("Sample_In_Cluster_complete_7.txt",header=TRUE,stringsAsFactors = FALSE)
-  clustered_samples <- clustered_samples %>% arrange(Cluster) %>% select(Sample_id)
-  
-  hypermut_matrix1 <- left_join(clustered_samples,hypermut_matrix,by="sample")
-  
-  #sample_order = rownames(cnvs)[clustered_samples]
-  
-  
-  
-  
-  
-  setwd("C:/Users/Nils_/OneDrive/Skrivbord/Data/MC3")
-  
-  
-  get_cancertype <- function(name){
-    
-    cancertype <- cohort[grep(name,cohort$sample), 2]
-    
-    return(cancertype)
-  }
-  
-  cancertype <- colnames(hypermut_matrix)
-  cancertype <- as.vector(sapply(cancertype,get_cancertype))
-  
-  colnames(hypermut_matrix) <- gsub("TCGA-","",gsub("-[A-Z0-9]*$","",colnames(hypermut_matrix)))
-  colnames(hypermut_matrix) <- paste(colnames(hypermut_matrix),cancertype,sep="-")
-}
+
 
 # Create 2 matrix: CNVs and SNVs ------------------------------------------
 #For running Malins script
@@ -344,6 +327,111 @@ genenames <- colnames(cnvs)
 
 
 
+# Malins plot -------------------------------------------------------------
+
+
+setwd("C:/Users/Nils_/OneDrive/Skrivbord/Bilder")
+
+
+imagefile <- "TEST.pdf"
+
+pdf("test.pdf",width=7, height=7)
+
+
+x = 1:(nrow(cnvs))
+y = 1:ncol(cnvs)
+centers <- expand.grid(y,x)
+layout(matrix(c(1,2), nrow=2, ncol=1),  widths=1, heights=c(9,1))
+#CNV matrix 
+par(mar = c(0,4.2,4.2,1))
+image(x,y,cnvs,
+      col = cnvcol,
+      #breaks = c(0,1,2,3,4,5),
+      xaxt = 'n', 
+      yaxt = 'n', 
+      xlab = '', 
+      ylab = '',
+      ylim = c(max(y) + 0.5, min(y) - 0.5)
+)
+
+#add black lines
+abline(h=y + 0.5, col=maincol[2])
+abline(v=x + 0.5, col=maincol[2])
+box(col=maincol[1])
+
+
+
+#Add SNVs
+for (i in 1:length(snv_labels)){
+  
+  if (snv_labels[i] == "NA"){
+    
+    next()
+    
+  }
+  
+  snvs_marks = which(snvs == snv_labels[i],arr.ind=T)
+  points(snvs_marks, pch = snvsymbols[i], bg=snvcol[i], col=snvcol[i], cex=0.7, lwd=0.7)
+  
+}
+
+
+
+
+
+
+#Gene names
+par(mar = c(0,4,4,1))
+mtext(genenames, at=(1:ncol(cnvs)), side=2, adj=1, las=1, cex=0.6, font=2, col=maincol[1])
+
+#Sample names
+par(mar = c(0,4.2,3.3,1))
+mtext(samplenames, at=1:nrow(cnvs), side=3, cex=0.5, las=3, adj=0, font=2)
+
+#
+par(mar = c(0,4.2,3.8,1))
+mtext(cancertype, at=1:nrow(cnvs), side=3, cex=0.6, las=3, padj=1, adj=0.5, col=labelcolors[1], font=2)
+
+
+#
+
+
+
+par(mar=c(2,4.2,1,19))
+image.scale(cnvs, col=cnvcol,  breaks =c(1:(length(cnv_labels)+1)), add.axis=FALSE)
+abline(v=c(0,1,2,3,4,5))
+mtext(c(0:(length(cnv_labels)-1)), at=((2:(length(cnv_labels)+1))-0.5), padj = 0.5, adj=0.5, side=1, cex=0.7, col=maincol[1])
+#mtext(c(4,0,1,2,3), at=((1:(length(cnv_labels)+1))-0.5), padj = 0.5, adj=0.5, side=1, cex=0.7, col=maincol[1]) 
+box(col=maincol[1])
+
+
+#SNV explanation
+####FRÅGA MALIN 
+#SNV legend next to the CNV levels image
+par(mar=c(2,30,1,0))
+legend("right", inset=c(-1.6,0), xpd = TRUE, snv_labels, pch=snvsymbols, pt.bg=snvcol,
+       pt.lwd=0.7, horiz=TRUE, cex=0.7 , bty="n", col=snvcol, text.col=maincol[1])
+
+
+
+dev.off()
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 # GGplot section ----------------------------------------------------------
 
 
@@ -439,21 +527,21 @@ longData$sample = factor(longData$sample, levels = sample_order)
 y_names <- sample_order
 y_name_colour <- data.frame(cluster = clustered_samples$Cluster)
 y_colour <- data.frame(cluster=c(1:length(unique(y_name_colour$cluster))),
-                      colour=distinctColorPalette(length(unique(y_name_colour$cluster))))
+                       colour=distinctColorPalette(length(unique(y_name_colour$cluster))))
 
 #or choose your own
 y_colour$colour <- c("#000000","#800000","#000075",
                      "#3cb44b","#9A6324","#469990","#a9a9a9")
 
 #y_colour$colour <- c("#000000","#800000","#000075",
-                     #"#3cb44b","#9A6324","#469990","#a9a9a9")
+#"#3cb44b","#9A6324","#469990","#a9a9a9")
 
 y_colour$colour <- c("#000000","#800000","#000000","#800000","#000000","#800000","#000000")
 
 y_name_colour <- left_join(y_name_colour,y_colour,by = "cluster")
 y_name_colour <- as.vector(y_name_colour$colour)
-    
-                      
+
+
 #get cancertype for these names
 cancertype <- as.vector(sapply(y_names,get_cancertype))
 y_names <- gsub("TCGA-","",gsub("-[A-Z0-9]*$","",y_names))
@@ -497,10 +585,10 @@ ggplot(longData,aes(x=gene,y=sample,fill=cnvs))+
   scale_x_discrete(expand=c(0,0))+
   #custom colours for cut levels and na values
   scale_fill_manual(values=c("#D55E00", "#E69F00","grey70","#56B4E9","#0072B2"))+
- 
+  
   #equal aspect ratio x and y axis
   #coord_fixed()+
- 
+  
   #Add snv data (remove NA(ie no mutation))
   geom_point(data=subset(longData,!snvs=="NA"), aes(shape=snvs),size=1)+
   scale_shape_manual(values=snv_shapes)+
@@ -537,121 +625,30 @@ ggplot(longData,aes(x=gene,y=sample,fill=cnvs))+
     #plot.background=element_blank(),
     #remove plot border
     panel.border = element_rect(fill = NA))
-    #panel.background= element_rect(colour = "black", fill=NA, size=1))
-   
-
-
-
-
-    library(grid)
-    dev.off()
-    
-    p 
-    
-    
-    
-    
-    grid.text("Distinct", x = unit(0.86, "npc"), y = unit(0.80, "npc"),
-              gp = gpar(fontsize = 4))
- 
-    
-    
-    
-    grid.text(number_mut$mut,x=as.numeric(number_mut$x_pos),
-              y=as.numeric(number_mut$y_pos))
-
-    
-
-
-
-# Malins plot -------------------------------------------------------------
-
-
-setwd("C:/Users/Nils_/OneDrive/Skrivbord/Data/Pictures")
-imagefile <- "TEST.pdf"
+#panel.background= element_rect(colour = "black", fill=NA, size=1))
 
 
 
 
 
-#pdf(imagefile, width=7, height=7)
-
+library(grid)
 dev.off()
 
-
-x = 1:(nrow(cnvs))
-y = 1:ncol(cnvs)
-centers <- expand.grid(y,x)
-layout(matrix(c(1,2), nrow=2, ncol=1),  widths=1, heights=c(9,1))
-#CNV matrix 
-par(mar = c(0,4.2,4.2,1))
-image(x,y,cnvs,
-      col = cnvcol,
-      #breaks = c(0,1,2,3,4,5),
-      xaxt = 'n', 
-      yaxt = 'n', 
-      xlab = '', 
-      ylab = '',
-      ylim = c(max(y) + 0.5, min(y) - 0.5)
-)
-
-#add black lines
-abline(h=y + 0.5, col=maincol[2])
-abline(v=x + 0.5, col=maincol[2])
-box(col=maincol[1])
-
-
-
-#Add SNVs
-for (i in 1:length(snv_labels)){
-  
-  if (snv_labels[i] == "NA"){
-    
-    next()
-    
-  }
-  
-  snvs_marks = which(snvs == snv_labels[i],arr.ind=T)
-  points(snvs_marks, pch = snvsymbols[i], bg=snvcol[i], col=snvcol[i], cex=0.7, lwd=0.7)
-  
-}
+p 
 
 
 
 
-
-
-#Gene names
-par(mar = c(0,4,4,1))
-mtext(genenames, at=(1:ncol(cnvs)), side=2, adj=1, las=1, cex=0.6, font=2, col=maincol[1])
-
-#Sample names
-par(mar = c(0,4.2,3.3,1))
-mtext(samplenames, at=1:nrow(cnvs), side=3, cex=0.5, las=3, adj=0, font=2)
-
-#
-par(mar = c(0,4.2,3.8,1))
-mtext(cancertype, at=1:nrow(cnvs), side=3, cex=0.6, las=3, padj=1, adj=0.5, col=labelcolors[1], font=2)
-
-
-#
+grid.text("Distinct", x = unit(0.86, "npc"), y = unit(0.80, "npc"),
+          gp = gpar(fontsize = 4))
 
 
 
-par(mar=c(2,4.2,1,30))
-image.scale(cnvs, col=cnvcol,  breaks =c(1:(length(cnv_labels)+1)), add.axis=FALSE)
-abline(v=c(0,1,2,3,4,5))
-mtext(c(0:(length(cnv_labels)-1)), at=((2:(length(cnv_labels)+1))-0.5), padj = 0.5, adj=0.5, side=1, cex=0.7, col=maincol[1])
-#mtext(c(4,0,1,2,3), at=((1:(length(cnv_labels)+1))-0.5), padj = 0.5, adj=0.5, side=1, cex=0.7, col=maincol[1]) 
-box(col=maincol[1])
+
+grid.text(number_mut$mut,x=as.numeric(number_mut$x_pos),
+          y=as.numeric(number_mut$y_pos))
 
 
-#SNV explanation
-####FRÅGA MALIN 
-#SNV legend next to the CNV levels image
-par(mar=c(2,20,1,0))
-legend("right", inset=c(-1.6,0), xpd = TRUE, snv_labels, pch=snvsymbols, pt.bg=snvcol,
-       pt.lwd=0.7, horiz=TRUE, cex=0.7 , bty="n", col=snvcol, text.col=maincol[1])
 
 
 

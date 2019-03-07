@@ -363,6 +363,8 @@ vcf_list_names <- gsub(".vcf","",gsub("[A-Z0-9]*/","",vcf_list))
 setwd("C:/Users/Nils_/OneDrive/Skrivbord/Data/MC3")
 cohort <- read.table("cohort.txt",stringsAsFactors = FALSE)
 
+
+
 treshold_nmut <- function(cancer_name){
   
   samples <- cohort %>% filter(subtype == cancer_name)
