@@ -101,11 +101,33 @@ Statistic_DF <- as.data.frame(sapply(mRNA_exp$`Hybridization-REF`, get_stat))
 
 setwd("C:/Users/Nils_/OneDrive/Skrivbord/Data/MC3")
 write.table(Statistic_DF,"Statistic_DF.txt")
+Statistic_DF <- read.table("Statistic_DF.txt",header=TRUE)
 
 
 
 
 
+#GGplot heatmatp of p values
+library(ggplot2)
+library(dplyr)
+library(reshape2)
+
+
+Stat.m <- melt(as.matrix(Statistic_DF))
+
+Stat_p.m <- Stat.m[Stat.m$value < 0.05 ,]
+
+ggplot(data = Stat.m, aes(x =Var2 , y = Var1)) +
+  geom_tile(aes(fill = value)) +
+  geom_point(data = Stat_p.m , aes(x =Var2 , y = Var1),colour="red",size =0.5)+
+  theme(axis.text.x = element_text(size=5,angle=90,hjust=1,vjust = 0.5),
+        axis.text.y = element_text(size=5))
+
+
+#Quick count on N in each group
+N <- sampleDF %>% filter(!cluster==0)
+N <- paste(N$cluster,N$cancer,sep=" ")
+table(N)
 
 
 
