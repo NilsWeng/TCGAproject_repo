@@ -26,115 +26,20 @@ colnames(mRNA_exp) <- gsub("\\.","-",colnames(mRNA_exp))
 colnames(mRNA_exp) <- gsub("-[A-Z0-9]*-[A-Z0-9]*-[A-Z0-9]*$","",colnames(mRNA_exp))
 
 
-#Add row with cluster data to later split by
-cluster_vector <- as.data.frame(colnames(mRNA_exp)[-1])
-colnames(cluster_vector) <- "Sample_id"
-cluster_vector <- merge(cluster_vector,clustered_samples,by="Sample_id",all=TRUE)
-#cluster_vector$Cluster[is.na(cluster_vector$Cluster)] <- "0"
+sampleDF <- data.frame("Sample_id" = colnames(mRNA_exp)[2:length(colnames(mRNA_exp))])
 
-row.names(mRNA_exp) <- mRNA_exp$`Hybridization-REF`
-
-mRNA_exp <- select(mRNA_exp, -one_of("Hybridization-REF"))
-
-
-# Split mRNA into cluster groups ------------------------------------------
-mRNA_exp1 <- rbind("Cluster"=cluster_vector$Cluster,mRNA_exp)
-mRNA_exp1 <- t(mRNA_exp1)
-mRNA_exp1 <- as.data.frame(mRNA_exp1)
-
-#Split table of all high-mut samples in each cluster
-mRNA_cluster <- split(mRNA_exp1, f = mRNA_exp1$Cluster)
-
-#rm("mRNA_exp1")
-
-# Information_DF ----------------------------------------------------------
-#Summarise infromation about clustered samples
-
-Information_DF <- clustered_samples %>% arrange(Cluster) 
-
-#Add cancer_type_data
+#Get cancer abb for each sample
 setwd("C:/Users/Nils_/OneDrive/Skrivbord/Data/MC3")
-cohort <- read.table("cohort.txt",stringsAsFactors = FALSE)
+TSS2Study <- read.table("TSS2Studyabb.txt",header=TRUE,stringsAsFactors = FALSE)
+code <- data.frame("TSS.Code"=gsub("TCGA-","",gsub("-[A-Z0-9]*-[A-Z0-9]*$","",sampleDF$Sample_id)))
+code <- left_join(code,TSS2Study,by="TSS.Code")
+sampleDF$cancer <- code$Study.Abbreviation
 
-get_cancertype <- function(name){
-  
-  cancertype <- cohort[grep(name,cohort$sample), 2 ]
-  
-  return(cancertype)
-}
+sampleDF <- left_join(sampleDF,clustered_samples,by="Sample_id")
+colnames(sampleDF) <- c("sample","cancer","cluster")
+sampleDF[is.na(sampleDF$cluster) ,3] <- "0"
 
-Information_DF$Cancer_type <- as.vector(sapply(Information_DF$Sample_id,get_cancertype))
-
-get_number_mut <- function(name){
-  
-  number_mut <- cohort[grep(name,cohort$sample), 4 ]
-  
-  return(number_mut)
-}
-
-Information_DF$number_mut  <-  as.vector(sapply(Information_DF$Sample_id,get_number_mut))
-
-
-
-
-
-
-
-
-
-# Significant - Over all samples/cancers --------------------------------------------------
-library(matrixStats)
-mRNA_exp <- as.matrix(mRNA_exp)
-std_row <- rowMads(mRNA_exp)
-
-
-
-
-get_Tstat_for_gene <- function(gene_name){
-  #Function that returns p-value of statistic test for each cluster given a gene name.
-  
-  gene_vector <- vector(mode="numeric", length=length(mRNA_cluster))
-  
-  pop_row <- mRNA_exp[rownames(mRNA_exp) == gene_name ,]
-  
-  
-  for (i in 1:length(mRNA_cluster)){
-    
-    sub_pop <- mRNA_cluster[[i]]
-    
-    #Select all samples except the ones from cluster 
-    other_pop_row  <- pop_row[!(names(pop_row) %in% colnames(sub_pop))]
-
-    
-    sub_pop <- select(sub_pop, -one_of("Cluster"))
-    sub_pop <- t(sub_pop)
-    
-    
-    
-    sub_pop_row <- sub_pop[rownames(sub_pop) == gene_name ,]
-    
- 
-    #statistic <- t.test(sub_pop_row,pop_row)$p.value
-    statistic <- wilcox.test(sub_pop_row,other_pop_row)$p.value
-    
-    gene_vector[i] <- statistic
-    #qqnorm(sub_pop_row,main="QQ plot of sub_pop",pch=19)
-    #qqline(sub_pop_row)
-    
-    
-  }
-  
-  
-  names(gene_vector) <- paste("cluster",c(1:length(mRNA_cluster)),sep="")
-  return(gene_vector)
-      
-  
-}
-
-#Returns p-value of wilcox.test for each cluster and gene
-Statistic_DF <- as.data.frame(sapply(rownames(mRNA_exp),get_Tstat_for_gene))
-
-
+rm(code,TSS2Study)
 
 
 
@@ -147,53 +52,55 @@ Statistic_DF <- as.data.frame(sapply(rownames(mRNA_exp),get_Tstat_for_gene))
 setwd("C:/Users/Nils_/OneDrive/Skrivbord/Data/MC3")
 cohort <- read.table("cohort.txt",stringsAsFactors = FALSE)
 
-get_cancertype <- function(name){
-  
-  cancertype <- cohort[grep(name,cohort$sample), 2 ]
-  
-  return(cancertype)
-}
-
-
-
-#mRNA expression data
-setwd("C:/Users/Nils_/Downloads/Firebrowse/Downloads")
-mRNA_exp <- read.table("PANCAN_mRNA_expression.txt",stringsAsFactors = FALSE,header=TRUE)
-colnames(mRNA_exp) <- gsub("\\.","-",colnames(mRNA_exp))
-colnames(mRNA_exp) <- gsub("-[A-Z0-9]*-[A-Z0-9]*-[A-Z0-9]*$","",colnames(mRNA_exp))
-
 
 #Loop over each cluster
 
 get_stat <- function(gene_name){
   
   
-  gene_name <- "AAAS"
   gene_exp_tot <- mRNA_exp %>% filter(`Hybridization-REF` == gene_name) %>% select(-one_of("Hybridization-REF"))
   
-  
-  
+  return_vector <- c()
+  name_vector <- c()
   for (i in 1:length(unique(clustered_samples$Cluster))){
     
-    i=1
-    samples_in_cluster <- data.frame("Sample_id"=clustered_samples %>% filter(Cluster == i) %>% select(Sample_id))
-    samples_in_cluster$cancer_type <- as.vector(sapply(samples_in_cluster$Sample_id,get_cancertype))
     
-    for (cancer in unique(samples_in_cluster$cancer_type)){
+    samples_in_cluster <- sampleDF %>% filter(cluster==i)
+    
+    
+    for (cancer_type in unique(samples_in_cluster$cancer)){
       
-      samples_in_cancer <- samples_in_cluster %>% filter(cancer_type == cancer)
-      gene_exp_cc <- gene_exp_tot[, colnames(gene_exp_tot) %in% samples_in_cancer$Sample_id]
-      all_samples
-      gene_exp_c <- gene_exp_tot[, colnames(gene_exp_tot) %in% ]
+      
+      samples_in_cancer <- sampleDF %>% filter(cancer==cancer_type) %>% select(sample)
+      samples_in_cancer_cluster <- samples_in_cluster %>% filter(cancer == cancer_type) %>% select(sample)
+      #filter away samples in cluster from cancer pop
+      samples_in_cancer <- data.frame("sample"=samples_in_cancer[!(samples_in_cancer$sample %in% samples_in_cancer_cluster$sample) ,])
+      
+      cancer_exp <- as.numeric(gene_exp_tot[, colnames(gene_exp_tot) %in% samples_in_cancer$sample])
+      cluster_exp <- as.numeric(gene_exp_tot[, colnames(gene_exp_tot) %in% samples_in_cancer_cluster$sample])
+      
+      stat <- wilcox.test(cancer_exp,cluster_exp)$p.value
+      
+      name <- paste(i,cancer_type,sep="_")
+      return_vector <- c(return_vector,stat)
+      name_vector <- c(name_vector,name)
       
     }
     
   }
-  
-  
+  print(paste("Done with",gene_name,sep=" "))
+  names(return_vector) <- name_vector
+  return(return_vector)
   
 }
 
+
+
+
+Statistic_DF <- as.data.frame(sapply(mRNA_exp$`Hybridization-REF`, get_stat))
+
+setwd("C:/Users/Nils_/OneDrive/Skrivbord/Data/MC3")
+write.table(Statistic_DF,"Statistic_DF.txt")
 
 
 
@@ -217,11 +124,17 @@ get_significant_genes <- function(Cluster){
 sig_Genes_In_Cluster <- lapply(rownames(Statistic_DF),get_significant_genes)
 
 
+get_all_sig_genes <- function(Cluster){
+  
+  hit <- paste(Cluster,"_",sep="")
+  genes <- Statistic_DF[grep(hit,rownames(Statistic_DF)),]
+  significant_genes <- colnames(genes[(colMeans(genes) < 0.25)])
+  return(significant_genes)
+}
 
 
-
-
-
+all_sig_Genes_In_Cluster <- lapply(c(1:7),get_all_sig_genes)
+all_sig_Genes_In_Cluster
 
 
 
