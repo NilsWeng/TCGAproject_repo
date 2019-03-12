@@ -256,7 +256,7 @@ snvs[snvs %in% expression]  <- "Expression regulation"
 snvs[snvs %in% inframe]     <- "In frame del/ins"
 snvs[snvs %in% AA_mod]      <- "AA modifying mut"
 
-unique(levels(factor(snvs)))
+
 
 # Visualise/plot matrix ---------------------------------------------------
 
@@ -491,7 +491,7 @@ ggplot(longData,aes(x=gene,y=sample,fill=cnvs))+
     #set x axis text size and colour
     axis.text.x=element_text(colour="black",angle=90, hjust=1,vjust = 0.5,size=4),
     #set y axis text colour and adjust vertical justification
-    axis.text.y=element_text(vjust = 0.2,colour=y_name_colour,size=5),
+    axis.text.y=element_text(vjust = 0.5,colour=y_name_colour,size=5),
     #axis.text.y=element_text(vjust = 0.2,colour="black",size=5),
     #change axis ticks thickness
     axis.ticks=element_line(size=0.4),

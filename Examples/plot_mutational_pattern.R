@@ -595,24 +595,97 @@ print_mutsign()
 # Cluster cosine-sim matrix
 
 ##################################################
+rm(list=ls())
 setwd("C:/Users/Nils_/OneDrive/Skrivbord/Data/MC3/Global_mutsign/High_mutations(3s)")
-library(MutationalPatterns)
+#scource("C:/Users/Nils_/MutationalPatterns/R")
+#source("C:/Users/Nils_/MutationalPatterns/R")
 load("high_mut_matrix.rda")
 colnames(mutational_matrix) <- gsub("-[A-Z0-9]*-[A-Z0-9]*-[A-Z0-9]*$","",colnames(mutational_matrix))
 setwd("C:/Users/Nils_/OneDrive/Skrivbord/Data/MC3")
 cosmic_signatures <- as.matrix(read.table("cosmic_signatures_extended.txt",header=TRUE))
+
+#Modify mutational patterns package (Open file nils)
+#"C:/Users/Nils_/MutationalPatterns/R" modify code
+#Only wokrs if mutational patterns already installed?
+#install.packages("C:/Users/Nils_/MutationalPatterns", repos = NULL, type = "source")
+#library(MutationalPatterns)
+library(MutationalPatterns)
+library(dplyr)
+library(robustbase)
 ###############################################
 
 cos_sim_samples_cosmic <- cos_sim_matrix(mutational_matrix, cosmic_signatures)
 sample_cluster <- hclust(dist(cos_sim_samples_cosmic,method="euclidean"),method="complete")
-plot(sample_cluster)
-N<-7
+N<- 10
 method <- "complete"
 cluster_groups <- cutree(sample_cluster,k=N)
 
+
 #Plot with found clusters
-plot(sample_cluster, cex = 0.6)
+rect.hclust.labels <- function(cluster,k){
+  
+  cluster_groups <- cutree(cluster,k=N)
+  X <- table(cluster_groups)[unique(cluster_groups[cluster$order])]
+  m <- c(0, cumsum(X))
+  library(zoo)
+  xpos <- rollmean(m,k=2)
+  #ypos <- rep(par("usr")[3L],length(X))
+  ypos <- rep(2.2,length(X))
+  text(xpos, ypos, names(X), adj=c(0,0), pos=3, col="black", cex=0.75)
+  
+}
+
+#plot(sample_cluster, cex = 0.5,labels=FALSE,xlab="",sub="",ylab="",axes=F,main="") # for naked/simple
+plot(sample_cluster, cex = 0.5,labels=FALSE,xlab="",sub="",ylab="",axes=F,main="")
 rect.hclust(sample_cluster, k = N, border = 2:5)
+rect.hclust.labels(sample_cluster,k=N)
+#Test
+
+
+
+
+
+
+
+
+
+#Extract what signatures are over certain treshold in each cluster
+sampleDF <- data.frame("cluster"=cluster_groups,"sample"=names(cluster_groups))
+treshold <- 0.6
+
+signatures_in_cluster <- function(cluster_id){
+  
+  
+  samples <- sampleDF %>% filter(cluster == cluster_id) %>% select(sample)
+  samples_cosine <- cos_sim_samples_cosmic[rownames(cos_sim_samples_cosmic) %in% samples$sample ,]
+  samples_cosine_mean <- colMeans(samples_cosine)
+  samples_cosine_median <- colMedians(as.matrix(samples_cosine))
+  
+  sig_signatures <- samples_cosine_mean[samples_cosine_mean > treshold]
+  sig_signatures <- sort(sig_signatures,decreasing = TRUE)
+  
+  return(sig_signatures)
+  
+}
+
+sampleDF <- data.frame("cluster"=cluster_groups,"sample"=names(cluster_groups))
+signatures <- lapply(c(1:7),signatures_in_cluster)
+signatures
+
+
+
+
+
+
+#plot cosine-heatmap
+hclust_cosmic = cluster_signatures(cosmic_signatures, method = "average")
+# store signatures in new order
+cosmic_order = colnames(cosmic_signatures)[hclust_cosmic$order]
+
+print(plot_cosine_heatmap(cos_sim_samples_cosmic, col_order = cosmic_order, cluster_rows = TRUE))
+
+
+
 
 
 #Determine optimal number of clusters (3 different methods)

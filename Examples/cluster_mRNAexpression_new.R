@@ -43,6 +43,81 @@ rm(code,TSS2Study)
 
 
 
+#Still runs slowly
+# Basic statistic , compare if entire cluster is significant --------------
+get_stat_cluster <- function(gene_name){
+  
+  gene_exp_tot <- mRNA_exp %>% filter(`Hybridization-REF` == gene_name) %>% select(-one_of("Hybridization-REF"))
+  #return_vector <- vector(mode="numeric", length=length(mRNA_cluster))
+  return_vector <- vector(mode="numeric", length=length(unique(clustered_samples$Cluster)))
+  name_vector <- vector(mode="character", length=length(unique(clustered_samples$Cluster)))
+  
+  for (i in 1:length(unique(clustered_samples$Cluster))){
+    
+    samples_in_cluster <- sampleDF %>% filter(cluster==i)
+    samples_not_in_cluster <- sampleDF %>% filter(!cluster==i)
+    
+    cluster_exp <-  as.numeric(gene_exp_tot[, colnames(gene_exp_tot) %in% samples_in_cluster$sample])
+    tot_exp <-  as.numeric(gene_exp_tot[, colnames(gene_exp_tot) %in% samples_not_in_cluster$sample])  
+    
+    stat <- wilcox.test(tot_exp,cluster_exp)$p.value
+    
+    
+    
+    return_vector[i] <- stat
+    
+
+  }
+  
+  name_vector <- c(1:length(unique(clustered_samples$Cluster)))
+  print(paste("done with",gene_name,sep=" "))
+  names(return_vector) <- name_vector
+  return(return_vector)
+
+  
+}
+
+basic_statistic_DF <- as.data.frame(sapply(mRNA_exp$`Hybridization-REF`, get_stat_cluster))
+#save data
+setwd("C:/Users/Nils_/OneDrive/Skrivbord/Data/MC3")
+write.table(basic_statistic_DF,"basic_statistic_DF.txt")
+basic_statistic_DF <- read.table("basic_statistic_DF.txt",header=TRUE)
+
+#visulaise
+
+get_significant_genes <- function(Cluster){
+  
+  
+  
+  significant_genes <- colnames(basic_statistic_DF)[basic_statistic_DF[(rownames(basic_statistic_DF) == Cluster) ,] < 0.05]
+  return(significant_genes)
+  
+}
+
+sig_Genes_In_Cluster <- lapply(rownames(basic_statistic_DF),get_significant_genes)
+sig_Genes_In_Cluster
+
+
+#Plot
+library(ggplot2)
+library(dplyr)
+library(reshape2)
+
+
+Stat.m <- melt(as.matrix(basic_statistic_DF))
+
+Stat_p.m <- Stat.m[Stat.m$value < 0.005 ,]
+
+ggplot(data = Stat.m, aes(x =Var2 , y = Var1)) +
+  geom_tile(aes(fill = value)) +
+  geom_point(data = Stat_p.m , aes(x =Var2 , y = Var1),colour="red",size =0.5)+
+  theme(axis.text.x = element_text(size=5,angle=90,hjust=1,vjust = 0.5),
+        axis.text.y = element_text(size=5))
+
+
+
+
+
 
 
 
@@ -54,7 +129,6 @@ cohort <- read.table("cohort.txt",stringsAsFactors = FALSE)
 
 
 #Loop over each cluster
-
 get_stat <- function(gene_name){
   
   
@@ -138,19 +212,19 @@ get_significant_genes <- function(Cluster){
   
 
   
-  significant_genes <- colnames(Statistic_DF)[Statistic_DF[(rownames(Statistic_DF) == Cluster) ,] < 0.05]
+  significant_genes <- colnames(basic_statistic_DF)[basic_statistic_DF[(rownames(basic_statistic_DF) == Cluster) ,] < 0.05]
   return(significant_genes)
   
 }
 
-sig_Genes_In_Cluster <- lapply(rownames(Statistic_DF),get_significant_genes)
+sig_Genes_In_Cluster <- lapply(rownames(basic_statistic_DF),get_significant_genes)
 
 
 get_all_sig_genes <- function(Cluster){
   
   hit <- paste(Cluster,"_",sep="")
   genes <- Statistic_DF[grep(hit,rownames(Statistic_DF)),]
-  significant_genes <- colnames(genes[(colMeans(genes) < 0.25)])
+  significant_genes <- colnames(genes[(colMeans(genes) < 0.05)])
   return(significant_genes)
 }
 
@@ -235,3 +309,35 @@ for (gene in genes){
 
 dev.off()
 
+
+
+#visualise cancer_types in each cluster
+test <- sampleDF %>% filter(!cluster==0)
+a <- table(paste(test$cluster,test$cancer,sep=""))
+A <- split(test,f=test$cluster)
+i=1
+
+
+cluster_histogram <- function(cluster){
+  
+  ggplot(A[[cluster]], aes(cancer)) + geom_bar() +
+    stat_count(aes(y=..count.., label=..count..), geom="text", vjust=-.5) + 
+    ggtitle(paste("Cluster ",cluster,"   N=",nrow(A[[cluster]]),sep="")) +
+  theme(axis.text.x = element_text(size=8,angle=90,hjust=1,vjust = 0.5))
+  
+}
+
+
+p1 <- cluster_histogram(1)
+p2 <- cluster_histogram(2)
+p3 <- cluster_histogram(3)
+p4 <- cluster_histogram(4)
+p5 <- cluster_histogram(5)
+p6 <- cluster_histogram(6)
+p7 <- cluster_histogram(7)
+
+
+library(grid)
+library(gridExtra)
+
+grid.arrange(p1,p2,p3,p4,p5,p6,p7,ncol=3)
